@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+server/dist
+client/build
+client/.svelte-kit
+coverage
+test-results
+playwright-report
+*.log
+.cursor
+.agents
+.specify
+tasks
+mongodb-data

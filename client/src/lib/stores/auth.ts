@@ -1,0 +1,74 @@
+import { writable, derived, get } from 'svelte/store';
+import { browser } from '$app/environment';
+
+export type Role =
+  | 'customer'
+  | 'mechanic'
+  | 'parts_coordinator'
+  | 'shop_admin'
+  | 'platform_operator';
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  preferredLanguage?: 'en' | 'ur';
+  shops?: unknown[];
+  accountStatus?: 'active' | 'pending_shop_owner';
+  onboardingPending?: boolean;
+}
+
+const CSRF_COOKIE = 'rc_csrf';
+const USER_KEY = 'rc_user';
+
+function loadUser(): AuthUser | null {
+  if (!browser) return null;
+  const raw = localStorage.getItem(USER_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function readCsrfCookie(): string | null {
+  if (!browser) return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${CSRF_COOKIE}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/** Session flag only — JWTs live in HttpOnly cookies, never in JS. */
+export const sessionActive = writable<boolean>(browser ? Boolean(loadUser()) : false);
+export const user = writable<AuthUser | null>(loadUser());
+export const csrfToken = writable<string | null>(browser ? readCsrfCookie() : null);
+
+export const isAuthenticated = derived(sessionActive, ($s) => $s);
+
+/** @deprecated Prefer sessionActive; kept so older imports compile during migration. */
+export const token = sessionActive;
+
+export function getCsrfToken(): string | null {
+  return get(csrfToken) || readCsrfCookie();
+}
+
+export function setSession(nextUser: AuthUser, nextCsrf?: string) {
+  sessionActive.set(true);
+  user.set(nextUser);
+  if (nextCsrf) csrfToken.set(nextCsrf);
+  else csrfToken.set(readCsrfCookie());
+  if (browser) {
+    localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
+    localStorage.removeItem('rc_token');
+  }
+}
+
+export function clearSession() {
+  sessionActive.set(false);
+  user.set(null);
+  csrfToken.set(null);
+  if (browser) {
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem('rc_token');
+  }
+}
+
+export function syncCsrfFromCookie() {
+  csrfToken.set(readCsrfCookie());
+}

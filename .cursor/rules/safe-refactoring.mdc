@@ -1,0 +1,25 @@
+---
+description: Safe refactoring constraints — preserve functionality
+alwaysApply: true
+---
+
+# Safe Refactoring
+
+Preserve existing functionality.
+
+Do NOT:
+- change database schema
+- change API contracts
+- change authentication
+- remove features
+- change business logic
+- break existing tests
+
+Only improve:
+- structure
+- readability
+- duplication
+- maintainability
+- performance where safe
+
+When refactoring, also follow `.cursor/skills/code-simplification/SKILL.md`.

@@ -1,0 +1,30 @@
+---
+description: Always route development through Spec Kit + agent skills lifecycle
+alwaysApply: true
+---
+
+# Development Lifecycle (Always On)
+
+For non-trivial work in this project, follow this order and read the matching skill before acting.
+
+## Phase map
+
+| Phase | Use when | Skill / tool |
+|-------|----------|--------------|
+| 1. Planning | New feature, unclear requirements, greenfield | `/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, `planning-and-task-breakdown`, `interview-me` |
+| 2. Architecture | System design, APIs, module boundaries | `api-and-interface-design`, `documentation-and-adrs`, architecture skills under `~/.cursor/skills` |
+| 3. Implementation | Building slices | `/speckit-implement`, `incremental-implementation`, `test-driven-development` |
+| 4. Testing | Prove behavior, UI flows | `test-driven-development`, `browser-testing-with-devtools`, Playwright MCP |
+| 5. Code review | Before merge / after substantive changes | `code-review-and-quality` |
+| 6. Security | Auth, input, secrets, deps, hardening | `security-and-hardening` + `semgrep scan --config auto` |
+| 7. Performance | Slow UI/API, Core Web Vitals | `performance-optimization` + `lighthouse <url>` |
+| 8. Refactoring | Cleanup without behavior change | `code-simplification` + safe-refactoring rule |
+| 9. Deployment | CI/CD, Docker, prod config | `ci-cd-and-automation`, `shipping-and-launch`, `observability-and-instrumentation` |
+
+## Rules
+
+1. Read `using-agent-skills` when unsure which skill applies.
+2. Prefer Spec Kit skills (`speckit-*`) for plan → tasks → implement on new features.
+3. Use Playwright MCP for real browser verification, not source-only guesses.
+4. Run Semgrep after security-sensitive changes; Lighthouse after frontend perf work.
+5. Do not skip review/security for auth, payments, data access, or public endpoints.

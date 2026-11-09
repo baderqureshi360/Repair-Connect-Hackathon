@@ -1,0 +1,63 @@
+# Linux verification for @sveltejs/adapter-vercel (symlinks require a non-Windows FS).
+# Does not deploy. Does not use adapter-node.
+name: Vercel client build (Linux)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'client/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vercel.json'
+      - 'scripts/promote-vercel-output.mjs'
+      - '.github/workflows/vercel-client-build.yml'
+
+jobs:
+  build-vercel-adapter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ADAPTER: vercel
+      VERCEL: '1'
+      VITE_API_URL: https://api.example.com
+      NODE_ENV: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install workspaces
+        run: npm ci
+
+      - name: Build client with adapter-vercel
+        run: npm run build -w client
+
+      - name: Assert Build Output API exists
+        run: |
+          test -d client/.vercel/output
+          test -f client/.vercel/output/config.json
+          echo "adapter-vercel output OK"
+          ls -la client/.vercel/output/functions | head -n 40
+
+      - name: Promote output for monorepo-root layout
+        run: node scripts/promote-vercel-output.mjs
+
+      - name: Secret scan (client bundle)
+        run: |
+          if grep -R -E 'JWT_SECRET|MONGODB_URI|PROVISIONING_API_KEY|Password123' client/.svelte-kit/output/client 2>/dev/null; then
+            echo "Secret-like string found in client bundle" >&2
+            exit 1
+          fi
+          echo "CLIENT_BUNDLE_SECRETS=none"
+          grep -R -F 'api.example.com' client/.svelte-kit/output/client --include='*.js' | head -n 3
+
+      - name: Upload .vercel/output artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vercel-build-output
+          path: .vercel/output
+          retention-days: 5
