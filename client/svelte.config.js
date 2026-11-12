@@ -24,8 +24,9 @@ const config = {
   kit: {
     adapter: useVercel
       ? adapterVercel({
-          // Pin runtime for local Node≠20/22 and for Vercel agreement.
-          runtime: 'nodejs20.x'
+          // Pin to a currently supported Vercel Function runtime (Node 20 is discontinued).
+          // Keep in sync with client/package.json engines.node.
+          runtime: 'nodejs26.x'
         })
       : adapterNode({ out: 'build' }),
     ...(isProdBuild
