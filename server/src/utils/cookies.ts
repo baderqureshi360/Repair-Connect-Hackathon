@@ -14,7 +14,11 @@ export function cookieBaseOptions(): CookieOptions {
     secure: env.cookieSecure,
     sameSite,
     path: '/',
+    // CHIPS: when cookies are set cross-site (direct API host), Partitioned keeps them usable
+    // under third-party cookie restrictions. Harmless for first-party (same-origin proxy) too.
+    ...(sameSite === 'none' ? { partitioned: true } : {}),
     // When API and client are on different sites, browsers require Secure + SameSite=None.
+    // Do not set Domain on *.vercel.app (public suffix) — leave host-only.
     ...(env.cookieDomain ? { domain: env.cookieDomain } : {})
   };
 }

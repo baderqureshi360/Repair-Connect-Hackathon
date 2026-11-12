@@ -16,17 +16,20 @@ Two Vercel projects, one GitHub repository, existing MongoDB Atlas.
 | Install Command | `cd .. && npm ci` |
 | Build Command | `npm run build` |
 | Output | Managed by `@sveltejs/adapter-vercel` |
-| Node.js | 20.x |
+| Node.js | 26.x |
 
 ### Frontend environment
 
 | Variable | When | Value |
 |----------|------|--------|
 | `ADAPTER` | build | `vercel` (also set in `client/vercel.json`) |
-| `VITE_API_URL` | **build** | `https://<backend-project>.vercel.app` (no trailing slash) |
+| `VITE_API_URL` | **build** | **Leave unset/empty** so the browser uses same-origin `/api/*` |
+| `API_PROXY_TARGET` | **runtime** (server-only) | `https://<backend-project>.vercel.app` (no trailing slash) |
 | `PUBLIC_SENTRY_DSN` | optional | Browser DSN only |
 
 Never set `MONGODB_URI` / `JWT_SECRET` / `CRON_SECRET` as `VITE_*`.
+
+> **Why empty `VITE_API_URL`?** `*.vercel.app` is a public suffix. Two Vercel projects are cross-site; browsers may block third-party auth cookies even with `SameSite=None`. The SvelteKit `/api/[...path]` route proxies to `API_PROXY_TARGET` so cookies are first-party on the frontend host.
 
 ---
 
@@ -39,8 +42,8 @@ Never set `MONGODB_URI` / `JWT_SECRET` / `CRON_SECRET` as `VITE_*`.
 | Install Command | `cd .. && npm ci` |
 | Build Command | `npm run build` |
 | Entry | `src/index.ts` / `src/server.ts` — **`export default app`** (no `listen` on Vercel) |
-| Node.js | 20.x |
-| Cron | `POST /api/cron/outbox` every 5 minutes (`server/vercel.json`) — confirm plan allows schedule |
+| Node.js | 26.x |
+| Cron | `POST /api/cron/outbox` — Hobby may require manual/on-demand drain; see plan blockers |
 
 ### Backend environment
 
@@ -52,7 +55,7 @@ Never set `MONGODB_URI` / `JWT_SECRET` / `CRON_SECRET` as `VITE_*`.
 | `JWT_SECRET` | yes | ≥ 32 chars |
 | `CLIENT_URL` | yes | Exact frontend origin `https://….vercel.app` |
 | `COOKIE_SECURE` | yes | `true` |
-| `COOKIE_SAME_SITE` | yes | **`none`** for split vercel.app hosts |
+| `COOKIE_SAME_SITE` | yes | Prefer **`lax`** when frontend uses same-origin `/api` proxy; use **`none`** if the browser calls the API host directly |
 | `COOKIE_DOMAIN` | no | unset unless sibling custom domains |
 | `CRON_SECRET` | yes for cron | Bearer token for `/api/cron/outbox` |
 | `SEED_ON_START` | no | must be unset/`false` |
@@ -75,13 +78,14 @@ Hobby Cron frequency limits may delay idle delivery — see plan blockers.
 
 ---
 
-## Auth checklist (split origins)
+## Auth checklist (recommended: same-origin proxy)
 
-1. Frontend build embeds `VITE_API_URL` → API host.
-2. Backend `CLIENT_URL` matches frontend origin exactly.
-3. `COOKIE_SAME_SITE=none` + `COOKIE_SECURE=true`.
-4. Browser: API host cookies `HttpOnly` + `Secure` + `SameSite=None`.
-5. Login JSON still provides `csrfToken` for cross-site header use.
+1. Frontend **build**: `VITE_API_URL` unset/empty (clear build cache after changing).
+2. Frontend **runtime**: `API_PROXY_TARGET=https://<backend>.vercel.app`.
+3. Backend `CLIENT_URL` matches frontend origin exactly.
+4. `COOKIE_SECURE=true`. Prefer `COOKIE_SAME_SITE=lax` with the proxy; `none` (+ Partitioned) remains for direct API calls.
+5. DevTools → Application: cookies appear on the **frontend** host after login.
+6. Login JSON still provides `csrfToken` (also readable from `rc_csrf` once first-party).
 
 ---
 

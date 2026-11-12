@@ -118,6 +118,50 @@ describe('Vercel dual-project deployment guards', () => {
     expect(['lax', 'none', 'strict']).toContain(env.cookieSameSite);
   });
 
+  it('emits Partitioned on SameSite=None auth cookies for CHIPS / third-party storage', async () => {
+    const { spawnSync } = await import('node:child_process');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const script = `
+      process.env.COOKIE_SAME_SITE = 'none';
+      process.env.COOKIE_SECURE = 'true';
+      process.env.VERCEL = '1';
+      process.env.NODE_ENV = 'production';
+      process.env.MONGODB_URI = 'mongodb+srv://user:pass@cluster.mongodb.net';
+      process.env.USE_MEMORY_DB = 'false';
+      process.env.JWT_SECRET = 'production-secret-that-is-long-enough-32';
+      process.env.CLIENT_URL = 'https://repair-connect-hackathon.vercel.app';
+      process.env.SEED_ON_START = 'false';
+      process.env.ALLOW_DEMO_LOGIN = 'false';
+      const { cookieBaseOptions } = await import('./src/utils/cookies.ts');
+      const opts = cookieBaseOptions();
+      console.log(JSON.stringify({ sameSite: opts.sameSite, secure: opts.secure, partitioned: opts.partitioned }));
+    `;
+    const result = spawnSync(process.execPath, ['--import', 'tsx', '-e', script], {
+      cwd: path.join(root, 'server'),
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        VERCEL: '1',
+        COOKIE_SAME_SITE: 'none',
+        COOKIE_SECURE: 'true',
+        NODE_ENV: 'production',
+        MONGODB_URI: 'mongodb+srv://user:pass@cluster.mongodb.net',
+        USE_MEMORY_DB: 'false',
+        JWT_SECRET: 'production-secret-that-is-long-enough-32',
+        CLIENT_URL: 'https://repair-connect-hackathon.vercel.app',
+        SEED_ON_START: 'false',
+        ALLOW_DEMO_LOGIN: 'false'
+      }
+    });
+    expect(result.status, result.stderr + result.stdout).toBe(0);
+    const parsed = JSON.parse((result.stdout || '').trim().split('\n').pop() || '{}');
+    expect(parsed.sameSite).toBe('none');
+    expect(parsed.secure).toBe(true);
+    expect(parsed.partitioned).toBe(true);
+  });
+
   it('defaults SameSite=None when VERCEL is set unless COOKIE_SAME_SITE overrides', async () => {
     const previousVercel = process.env.VERCEL;
     const previousSameSite = process.env.COOKIE_SAME_SITE;

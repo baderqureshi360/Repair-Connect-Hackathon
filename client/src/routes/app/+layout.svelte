@@ -14,9 +14,9 @@
   onMount(async () => {
     try {
       const me = await api<AuthUser & { preferences?: Record<string, unknown> }>('/api/v1/auth/me');
-      // Cross-origin: rc_csrf is not readable from the SPA; restore from API when needed.
+      // Prefer readable rc_csrf (same-origin proxy); otherwise mint via API body.
       let csrf = getCsrfToken() || undefined;
-      if (!csrf && import.meta.env.VITE_API_URL) {
+      if (!csrf) {
         try {
           const minted = await api<{ csrfToken: string }>('/api/v1/auth/csrf');
           csrf = minted.csrfToken;

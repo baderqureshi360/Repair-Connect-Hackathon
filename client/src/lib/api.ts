@@ -56,12 +56,16 @@ async function readApiBody(res: Response): Promise<ApiErrorBody> {
 
 type ApiOptions = RequestInit & { idempotencyKey?: string; full?: boolean; skipRefresh?: boolean };
 
-async function tryRefresh(): Promise<boolean> {
+/** Coalesce concurrent 401→refresh attempts into one network round-trip. */
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefreshOnce(): Promise<boolean> {
   try {
     syncCsrfFromCookie();
     let csrf = getCsrfToken();
-    // Cross-site SPA cannot read rc_csrf via document.cookie — mint via API if needed.
-    if (!csrf && API_BASE) {
+    // When API is cross-origin, rc_csrf is not readable via document.cookie — mint via API.
+    // Same-origin proxy makes the cookie first-party again; bootstrap still helps cold loads.
+    if (!csrf) {
       const bootstrap = await fetch(`${API_BASE}/api/v1/auth/csrf`, {
         method: 'GET',
         credentials: 'include'
@@ -92,6 +96,14 @@ async function tryRefresh(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function tryRefresh(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = tryRefreshOnce().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
 }
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
