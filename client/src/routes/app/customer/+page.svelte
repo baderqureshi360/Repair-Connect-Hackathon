@@ -40,7 +40,6 @@
         .filter((x) => x.status === 'booked' && new Date(x.startsAt) >= new Date())
         .slice(0, 5);
       categories = cats?.length ? cats : SERVICE_CATEGORIES.map((c) => ({ ...c, shopCount: 0 }));
-      // Preserve recent order from localStorage.
       const byId = new Map((recent.data || []).map((s: any) => [String(s._id), s]));
       recentShops = recentIds.map((id) => byId.get(id)).filter(Boolean);
     } catch (err: any) {
@@ -63,19 +62,23 @@
   const firstName = $derived($user?.name?.split(' ')[0] || $t('customer'));
 </script>
 
-<section class="space-y-8">
-  <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight md:text-3xl">
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
+  <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+    <div class="min-w-0">
+      <p class="text-xs font-semibold uppercase tracking-wide text-muted">{$t('dashboard')}</p>
+      <h1 class="mt-1 text-xl font-semibold tracking-tight text-ink md:text-2xl">
         {$t('welcomeBack')}, {firstName}
       </h1>
-      <p class="mt-1 text-sm text-muted">{$t('customerHomeSubtitle')}</p>
+      <p class="mt-1 max-w-2xl text-sm text-muted">{$t('customerHomeSubtitle')}</p>
     </div>
-    <Button href="/app/customer/shops" variant="primary" size="sm">{$t('findRepairShops')}</Button>
-  </div>
+    <div class="flex flex-wrap gap-2">
+      <Button href="/app/customer/new" variant="outline" size="sm">{$t('submitRepairRequest')}</Button>
+      <Button href="/app/customer/shops" variant="primary" size="sm">{$t('findRepairShops')}</Button>
+    </div>
+  </header>
 
   <form class="surface-card flex flex-col gap-3 p-4 sm:flex-row sm:items-end" onsubmit={searchShops}>
-    <div class="flex-1">
+    <div class="min-w-0 flex-1">
       <label class="mb-1 block text-sm font-medium" for="shop-search">{$t('searchRepairShops')}</label>
       <input
         id="shop-search"
@@ -88,25 +91,53 @@
   </form>
 
   {#if loading}
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true">
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-busy="true" aria-label={$t('loading')}>
       {#each Array.from({ length: 6 }) as _}<Skeleton class="h-24" />{/each}
     </div>
   {:else if error}
-    <Alert type="error" role="alert" message={error} />
+    <div class="space-y-3">
+      <Alert type="error" role="alert" message={error} />
+      <Button variant="outline" onclick={load}>{$t('retry')}</Button>
+    </div>
   {:else}
+    {#if pendingEstimates.length}
+      <section class="priorities-panel rounded-[var(--radius-ui)] p-4" aria-labelledby="action-needed-heading">
+        <h2 id="action-needed-heading" class="priorities-title mb-1 text-sm font-semibold">
+          {$t('nextAction')}
+        </h2>
+        <p class="priorities-hint mb-3 text-xs">{$t('pendingApprovals')}</p>
+        <ul class="space-y-2 text-sm" role="list">
+          {#each pendingEstimates as repair}
+            <li>
+              <a
+                class="flex items-start gap-2 text-ink hover:text-[color:var(--color-primary-hover)]"
+                href={`/app/repairs/${repair._id}`}
+              >
+                <Icon name="alertTriangle" size={15} class="mt-0.5 shrink-0 text-warning" />
+                <span>
+                  <span class="font-medium">{$t('reviewEstimates')}: {repair.referenceNumber}</span>
+                  <span class="block text-xs text-muted">{repair.brand} {repair.model}</span>
+                </span>
+              </a>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
     <div>
       <div class="mb-3 flex items-center justify-between gap-2">
-        <h2 class="text-base font-semibold">{$t('browseByCategory')}</h2>
-        <a class="text-sm font-medium text-accent hover:underline" href="/app/customer/shops">{$t('viewAll')}</a>
+        <h2 class="text-sm font-semibold text-ink">{$t('browseByCategory')}</h2>
+        <a class="text-xs font-medium hover:underline" href="/app/customer/shops">{$t('viewAll')}</a>
       </div>
-      <ul class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <ul class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" role="list">
         {#each categories as cat}
           <li>
             <a
               class="surface-card surface-card-interactive flex h-full flex-col gap-1 p-4"
               href={`/app/customer/shops?category=${encodeURIComponent(cat.id)}`}
             >
-              <span class="font-medium">{cat.label || categoryLabel(cat.id)}</span>
+              <span class="font-medium text-ink">{cat.label || categoryLabel(cat.id)}</span>
               <span class="text-sm text-muted">
                 {cat.shopCount
                   ? $t('shopsOfferingCount').replace('{count}', String(cat.shopCount))
@@ -120,11 +151,11 @@
 
     {#if recentShops.length}
       <div>
-        <h2 class="mb-3 text-base font-semibold">{$t('recentlyViewedShops')}</h2>
-        <ul class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <h2 class="mb-3 text-sm font-semibold text-ink">{$t('recentlyViewedShops')}</h2>
+        <ul class="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list">
           {#each recentShops as shop}
             <li class="surface-card p-4">
-              <a class="font-medium text-accent hover:underline" href={`/app/customer/shops/${shop._id}`}>
+              <a class="font-medium hover:underline" href={`/app/customer/shops/${shop._id}`}>
                 {shop.name}
               </a>
               <p class="mt-1 text-sm text-muted">{shop.city} · {shop.address}</p>
@@ -134,17 +165,17 @@
       </div>
     {/if}
 
-    <div class="grid gap-4 lg:grid-cols-3">
-      <div class="surface-card p-4 lg:col-span-2">
+    <div class="grid gap-4 xl:grid-cols-3">
+      <section class="surface-card flex flex-col p-4 xl:col-span-2" aria-labelledby="active-repairs-heading">
         <div class="mb-3 flex items-center justify-between gap-2">
-          <h2 class="text-base font-semibold">{$t('activeRepairs')}</h2>
-          <a class="text-sm font-medium text-accent hover:underline" href="/app/customer/repairs">{$t('viewAll')}</a>
+          <h2 id="active-repairs-heading" class="text-sm font-semibold text-ink">{$t('activeRepairs')}</h2>
+          <a class="text-xs font-medium hover:underline" href="/app/customer/repairs">{$t('viewAll')}</a>
         </div>
-        <ul class="space-y-2">
+        <ul class="flex-1 space-y-2" role="list">
           {#each active as repair}
-            <li class="surface-card surface-card-interactive p-3">
+            <li class="rounded-[var(--radius-ui)] border border-border px-3 py-2.5">
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <a class="font-medium text-accent hover:underline" href={`/app/repairs/${repair._id}`}>
+                <a class="font-medium hover:underline" href={`/app/repairs/${repair._id}`}>
                   {repair.referenceNumber}
                 </a>
                 <StatusPill status={repair.status} />
@@ -152,47 +183,34 @@
               <p class="mt-1 text-sm text-muted">{repair.brand} {repair.model} — {repair.deviceType}</p>
             </li>
           {:else}
-            <li class="text-muted">{$t('empty')}</li>
+            <li class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-6 text-center text-sm text-muted" role="status">
+              {$t('empty')}
+            </li>
           {/each}
         </ul>
-      </div>
+      </section>
 
-      <div class="space-y-4">
-        <div class="surface-card p-4">
-          <div class="mb-3 flex items-center justify-between gap-2">
-            <h2 class="text-base font-semibold">{$t('upcomingAppointments')}</h2>
-            <a class="text-sm font-medium text-accent hover:underline" href="/app/customer/appointments">{$t('viewAll')}</a>
-          </div>
-          <ul class="space-y-2 text-sm">
-            {#each appointments as appt}
-              <li class="flex items-start gap-2">
-                <Icon name="calendar" size={15} class="mt-0.5 text-accent" />
-                <span>
-                  <span class="font-medium">{new Date(appt.startsAt).toLocaleString()}</span>
-                  <span class="block text-muted">{appt.shop?.name || ''}</span>
-                </span>
-              </li>
-            {:else}
-              <li class="text-muted">{$t('empty')}</li>
-            {/each}
-          </ul>
+      <section class="surface-card flex flex-col p-4" aria-labelledby="upcoming-appts-heading">
+        <div class="mb-3 flex items-center justify-between gap-2">
+          <h2 id="upcoming-appts-heading" class="text-sm font-semibold text-ink">{$t('upcomingAppointments')}</h2>
+          <a class="text-xs font-medium hover:underline" href="/app/customer/appointments">{$t('viewAll')}</a>
         </div>
-
-        <div class="priorities-panel rounded-xl p-4">
-          <h2 class="mb-3 text-base font-semibold text-white">{$t('pendingApprovals')}</h2>
-          <ul class="space-y-2 text-sm text-indigo-50">
-            {#each pendingEstimates as repair}
-              <li>
-                <a class="hover:text-white" href={`/app/repairs/${repair._id}`}>
-                  {$t('reviewEstimates')}: {repair.referenceNumber}
-                </a>
-              </li>
-            {:else}
-              <li class="text-indigo-100/70">{$t('empty')}</li>
-            {/each}
-          </ul>
-        </div>
-      </div>
+        <ul class="flex-1 space-y-2 text-sm" role="list">
+          {#each appointments as appt}
+            <li class="flex items-start gap-2 rounded-[var(--radius-ui)] border border-border px-2.5 py-2">
+              <Icon name="calendar" size={15} class="mt-0.5 shrink-0 text-accent" />
+              <span class="min-w-0">
+                <span class="block font-medium text-ink">{new Date(appt.startsAt).toLocaleString()}</span>
+                <span class="block text-xs text-muted">{appt.shop?.name || ''}</span>
+              </span>
+            </li>
+          {:else}
+            <li class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-6 text-center text-muted" role="status">
+              {$t('empty')}
+            </li>
+          {/each}
+        </ul>
+      </section>
     </div>
   {/if}
 </section>

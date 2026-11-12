@@ -1,13 +1,15 @@
 /**
  * Operational shop roles: customer | mechanic | parts_coordinator | shop_admin.
- * Platform authority (not shop-scoped): platform_operator — reviews shop applications only.
- * Ordinary shop admins never receive platform privileges.
+ * Independent business role: supplier (not a shop employee; no ShopMembership required).
+ * Platform authority (not shop-scoped): platform_operator — reviews shop/supplier applications.
+ * Ordinary shop admins / suppliers never receive platform privileges.
  */
 export const ROLES = [
   'customer',
   'mechanic',
   'parts_coordinator',
   'shop_admin',
+  'supplier',
   'platform_operator'
 ] as const;
 export type Role = (typeof ROLES)[number];
@@ -18,6 +20,8 @@ export const OPERATIONAL_ROLES = [
   'parts_coordinator',
   'shop_admin'
 ] as const;
+
+export const BUSINESS_ROLES = ['supplier'] as const;
 
 export const PLATFORM_ROLES = ['platform_operator'] as const;
 

@@ -197,8 +197,8 @@
             type="line"
             heightClass="h-64"
             series={[
-              { label: $t('repairs'), points: businessOverview.repairs, color: '#4f46e5' },
-              { label: $t('recordedRevenue'), points: businessOverview.revenue, color: '#38bdf8' }
+              { label: $t('repairs'), points: businessOverview.repairs },
+              { label: $t('recordedRevenue'), points: businessOverview.revenue }
             ]}
           />
         </div>

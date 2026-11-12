@@ -1,0 +1,78 @@
+# RepairConnect — Render Blueprint (hackathon)
+# Two free Node web services from the npm workspaces monorepo.
+# Database: existing MongoDB Atlas (not provisioned here).
+# Secrets are prompted at Blueprint create (sync: false) — never commit real values.
+# Docs: docs/RENDER_HACKATHON_DEPLOYMENT.md
+
+services:
+  - type: web
+    name: repairconnect-backend
+    runtime: node
+    plan: free
+    region: oregon
+    # Repo root so npm workspaces resolve (do not set rootDir to server/).
+    buildCommand: npm ci && npm run build -w server
+    startCommand: npm run start -w server
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: '20'
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: '0.0.0.0'
+      # Render injects PORT (default 10000). App reads process.env.PORT.
+      - key: USE_MEMORY_DB
+        value: 'false'
+      - key: SEED_ON_START
+        value: 'false'
+      - key: ALLOW_DEMO_LOGIN
+        value: 'false'
+      - key: COOKIE_SECURE
+        value: 'true'
+      # Separate onrender.com front + API domains are cross-site.
+      - key: COOKIE_SAME_SITE
+        value: none
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      # Exact frontend origin (CORS + credentialed cookies). Wired after both services exist.
+      - key: CLIENT_URL
+        fromService:
+          name: repairconnect-frontend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      # Optional extras — set in Dashboard if needed (Blueprint sync: false ignored on updates).
+      # CLIENT_URL_ALT, COOKIE_DOMAIN, PROVISIONING_API_KEY, SENTRY_*
+
+  - type: web
+    name: repairconnect-frontend
+    runtime: node
+    plan: free
+    region: oregon
+    # Repo root so npm workspaces resolve (do not set rootDir to client/).
+    buildCommand: npm ci && npm run build -w client
+    # adapter-node output (default ADAPTER=node; VERCEL unset).
+    startCommand: node client/build/index.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: '20'
+      - key: NODE_ENV
+        value: production
+      - key: ADAPTER
+        value: node
+      - key: HOST
+        value: '0.0.0.0'
+      # Trust Render's TLS-terminating proxy (adapter-node).
+      - key: PROTOCOL_HEADER
+        value: x-forwarded-proto
+      - key: HOST_HEADER
+        value: x-forwarded-host
+      # Build-time public API origin (existing Vite env — see client/src/lib/api.ts).
+      - key: VITE_API_URL
+        fromService:
+          name: repairconnect-backend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL

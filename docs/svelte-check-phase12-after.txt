@@ -1,0 +1,81 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm 
+help npmrc` for supported config options.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+> client@1.0.0 check
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+The following Vite config options will be overridden by SvelteKit:
+  - root
+Loading svelte-check in workspace: c:\Users\bader\Desktop\Hackathon\client
+Getting Svelte diagnostics...
+
+c:\Users\bader\Desktop\Hackathon\client\src\hooks.client.ts:14:5
+Error: Object literal may only specify known properties, and 'sendDefaultPii' does not exist in type 'CoreOptions<BaseTransportOptions> | BrowserOptions | NodeOptions'. 
+    tracesSampleRate: Number(import.meta.env.PUBLIC_SENTRY_TRACES_SAMPLE_RATE || 0.05),
+    sendDefaultPii: false,
+    beforeSend(event) {
+
+c:\Users\bader\Desktop\Hackathon\client\src\hooks.server.ts:12:5
+Error: Object literal may only specify known properties, and 'sendDefaultPii' does not exist in type 'CoreOptions<BaseTransportOptions> | BrowserOptions | NodeOptions'. 
+    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE || 0.05),
+    sendDefaultPii: false
+  });
+
+c:\Users\bader\Desktop\Hackathon\client\src\routes\app\admin\purchase-orders\[id]\+page.svelte:97:22
+Error: 'grn' is of type 'unknown'. (ts)
+      });
+      okMsg = `GRN ${grn.publicId} posted. Stock updated for accepted quantities only.`;
+      await load();
+
+c:\Users\bader\Desktop\Hackathon\client\src\routes\app\admin\rfqs\[id]\+page.svelte:85:52
+Error: 'po' is of type 'unknown'. (ts)
+                });
+                goto(`/app/admin/purchase-orders/${po.publicId}`);
+              } catch (err) {
+
+c:\Users\bader\Desktop\Hackathon\client\src\routes\app\repairs\[id]\+page.svelte:61:5
+Error: Type 'unknown' is not assignable to type 'any[]'. (ts)
+    detail = await api(`/api/v1/repairs/${$page.params.id}`);
+    messages = await api(`/api/v1/repairs/${$page.params.id}/messages`).catch(() => []);
+    if ($user?.role === 'shop_admin') {
+
+c:\Users\bader\Desktop\Hackathon\client\src\routes\app\repairs\[id]\+page.svelte:276:7
+Error: This expression is not callable.
+  Type 'Writable<string>' has no call signatures. (ts)
+      reverseTarget = null;
+      announce($t('reversalSuccess'));
+      toasts.success($t('reversalSuccess'));
+
+c:\Users\bader\Desktop\Hackathon\client\src\routes\app\supplier\catalog\+page.svelte:115:7
+Error: Type 'string' is not assignable to type '"screens_displays"'. (ts)
+      manufacturerPartNumber: item.manufacturerPartNumber || '',
+      category: item.category,
+      brand: item.brand || '',
+
+c:\Users\bader\Desktop\Hackathon\client\src\routes\login\+page.svelte:69:9
+Error: This comparison appears to be unintentional because the types '"active" | undefined' and '"pending_supplier"' have no overlap. (ts)
+        data.user.accountStatus === 'pending_shop_owner' ||
+        data.user.accountStatus === 'pending_supplier'
+      ) {
+
+c:\Users\bader\Desktop\Hackathon\client\src\routes\login\+page.svelte:72:11
+Error: This comparison appears to be unintentional because the types '"active" | "pending_shop_owner" | undefined' and '"pending_supplier"' have no overlap. (ts)
+        goto(
+          data.user.accountStatus === 'pending_supplier' || data.user.role === 'supplier'
+            ? '/app/supplier-application/status'
+
+====================================
+svelte-check found 9 errors and 0 warnings in 7 files
+npm error Lifecycle script `check` failed with error:
+npm error code 1
+npm error path C:\Users\bader\Desktop\Hackathon\client
+npm error workspace client@1.0.0
+npm error location C:\Users\bader\Desktop\Hackathon\client
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c svelte-kit sync && svelte-check --tsconfig ./tsconfig.json

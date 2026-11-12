@@ -9,7 +9,9 @@ import {
   getShopApplicationStatus,
   registerShopOwnerApplication
 } from '../services/shopApplications.js';
+import { registerSupplierApplication } from '../services/supplierApplications.js';
 import { strongPasswordSchema } from '../validators/password.js';
+import { PART_CATEGORY_IDS } from '../constants/partCategories.js';
 
 const router = Router();
 
@@ -30,6 +32,16 @@ const shopAppLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, error: { message: 'Too many applications', code: 'RATE_LIMITED' } }
 });
+
+const supplierAppLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: isTest ? 10_000 : 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { message: 'Too many applications', code: 'RATE_LIMITED' } }
+});
+
+const partCategoryEnum = z.enum(PART_CATEGORY_IDS as [string, ...string[]]);
 
 const lookupSchema = z.object({
   referenceNumber: z.string().min(3).max(40),
@@ -153,5 +165,59 @@ router.get('/shop-applications/:id', shopAppLimiter, async (req, res, next) => {
     next(err);
   }
 });
+
+/** Independent supplier business registration with password + pending account. */
+export const supplierRegisterSchema = z
+  .object({
+    contactPerson: z.string().min(2).max(120),
+    email: z.string().email().max(160),
+    phone: z.string().min(5).max(40),
+    password: strongPasswordSchema,
+    confirmPassword: z.string().min(8).max(128),
+    businessName: z.string().min(2).max(160),
+    address: z.string().min(5).max(300),
+    city: z.string().min(2).max(80),
+    region: z.string().min(2).max(80),
+    description: z.string().min(10).max(2000),
+    partCategories: z.array(partCategoryEnum).min(1).max(12),
+    supportedBrands: z.array(z.string().min(1).max(60)).max(40).optional(),
+    deliveryCities: z.array(z.string().min(1).max(80)).min(1).max(40),
+    logoUrl: z.string().max(400_000).optional(),
+    verificationDocuments: z
+      .array(
+        z.object({
+          name: z.string().min(1).max(160),
+          dataUrl: z.string().min(1).max(400_000)
+        })
+      )
+      .max(5)
+      .optional(),
+    termsAccepted: z.literal(true),
+    role: z.undefined().optional(),
+    shopId: z.undefined().optional()
+  })
+  .superRefine((val, ctx) => {
+    if (val.password !== val.confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Passwords do not match',
+        path: ['confirmPassword']
+      });
+    }
+  });
+
+router.post(
+  '/supplier-applications/register',
+  supplierAppLimiter,
+  validate(supplierRegisterSchema),
+  async (req, res, next) => {
+    try {
+      const data = await registerSupplierApplication({ ...req.body, ip: req.ip });
+      return ok(res, data, 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 export default router;

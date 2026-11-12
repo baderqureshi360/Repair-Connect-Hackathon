@@ -20,7 +20,19 @@ import {
 } from '../models/index.js';
 import { describeReserveError, reserveStock, stockIn } from '../services/inventory.js';
 import { AppError } from '../utils/errors.js';
-import { createRepairRequest, assignMechanic, addDiagnosis, submitEstimate, decideEstimate, requestParts, completeRepair, startRepairWork } from '../services/repairs.js';
+import {
+  createRepairRequest,
+  assignMechanic,
+  addDiagnosis,
+  submitEstimate,
+  decideEstimate,
+  requestParts,
+  completeRepair,
+  startRepairWork,
+  confirmCollection,
+  closeRepairCase
+} from '../services/repairs.js';
+import { recordPayment } from '../services/documents.js';
 import type { AuthUser } from '../middleware/auth.js';
 
 async function main() {
@@ -161,19 +173,54 @@ async function main() {
   });
 
   await startRepairWork({ repairId: repair._id.toString(), mechanic: mechanicUser });
-  await completeRepair({
+  // completeRepair finishes work → ready_for_collection (does not close the case)
+  const afterWork = await completeRepair({
     repairId: repair._id.toString(),
     mechanic: mechanicUser,
     workPerformed: 'Replaced screen on Atlas verify run',
     finalCost: 2000
   });
+  if (!afterWork || afterWork.status !== 'ready_for_collection') {
+    throw new Error(
+      `Expected ready_for_collection after completeRepair, got ${afterWork?.status || 'missing'}`
+    );
+  }
 
-  const { confirmCollection } = await import('../services/repairs.js');
-  await confirmCollection({
+  // confirmCollection records handover but leaves status ready_for_collection
+  const afterCollect = await confirmCollection({
     repairId: repair._id.toString(),
     staff: adminUser,
     notes: 'Atlas verify collection'
   });
+  if (!afterCollect?.collectedAt) {
+    throw new Error('Collection was not persisted (collectedAt missing)');
+  }
+  if (afterCollect.status !== 'ready_for_collection') {
+    throw new Error(
+      `Expected ready_for_collection after confirmCollection, got ${afterCollect.status}`
+    );
+  }
+
+  // Settle customer payment then close — only closeRepairCase sets status=completed
+  await recordPayment({
+    user: adminUser,
+    repairId: repair._id.toString(),
+    amount: 2000,
+    method: 'cash',
+    notes: 'Atlas verify settlement',
+    idempotencyKey: `atlas-pay-${marker}`,
+    confirmedReceived: true
+  });
+  const closed = await closeRepairCase({
+    repairId: repair._id.toString(),
+    staff: adminUser,
+    notes: 'Atlas verify case closure'
+  });
+  if (!closed || closed.status !== 'completed') {
+    throw new Error(
+      `Expected completed after closeRepairCase, got ${closed?.status || 'missing'}`
+    );
+  }
 
   const repairId = repair._id.toString();
   const partId = screen._id.toString();
@@ -192,7 +239,9 @@ async function main() {
   const collections = await mongoose.connection.db?.listCollections().toArray();
 
   if (!persistedRepair || persistedRepair.status !== 'completed') {
-    throw new Error('Repair did not persist as completed after reconnect');
+    throw new Error(
+      `Repair did not persist as completed after reconnect (status=${persistedRepair?.status ?? 'missing'}, collectedAt=${persistedRepair?.collectedAt ?? 'n/a'}, completedAt=${persistedRepair?.completedAt ?? 'n/a'})`
+    );
   }
   if (!persistedPart || persistedPart.quantityReserved !== 0 || persistedPart.quantityAvailable !== 0) {
     throw new Error(

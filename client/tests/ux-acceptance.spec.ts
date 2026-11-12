@@ -2,34 +2,18 @@ import { test, expect, type Page, type APIRequestContext } from '@playwright/tes
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { apiLogin, loginAs } from './helpers/auth';
 
 const API = 'http://localhost:5000';
 const PASSWORD = 'Password123!';
 const shotDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'test-results', 'ux-print');
 
-async function apiLogin(request: APIRequestContext, email: string) {
-  const res = await request.post(`${API}/api/v1/auth/login`, {
-    data: { email, password: PASSWORD }
-  });
-  expect(res.ok(), await res.text()).toBeTruthy();
-  const body = await res.json();
-  const csrf =
-    body.data?.csrfToken ||
-    (await request.storageState()).cookies.find((c) => c.name === 'rc_csrf')?.value;
-  expect(csrf).toBeTruthy();
-  return { csrf: String(csrf), body };
-}
-
 function csrfHeaders(csrf: string) {
   return { 'X-CSRF-Token': csrf };
 }
 
-async function loginUi(page: Page, email: string) {
-  await page.goto('/login');
-  await page.getByLabel(/email|ای میل/i).fill(email);
-  await page.getByLabel(/password|پاس ورڈ/i).fill(PASSWORD);
-  await page.getByRole('button', { name: /sign in|سائن ان/i }).click();
-  await page.waitForURL(/\/app\//, { timeout: 20000 });
+async function loginUi(page: Page, request: APIRequestContext, email: string) {
+  await loginAs(page, request, email);
 }
 
 async function logoutUi(page: Page) {
@@ -92,7 +76,7 @@ test.describe('UX acceptance — print, analytics, account switch', () => {
       doc = (await fallback.json()).data;
     }
 
-    await loginUi(page, 'admin@repairconnect.local');
+    await loginUi(page, request, 'admin@repairconnect.local');
     await page.goto(`/app/documents/${doc._id}`);
     await expect(page.locator('.print-doc')).toBeVisible();
 
@@ -141,16 +125,18 @@ test.describe('UX acceptance — print, analytics, account switch', () => {
     expect(qrOnPrint).toBe(0);
   });
 
-  test('chart values match underlying data tables for same range', async ({ page }) => {
-    await loginUi(page, 'customer@repairconnect.local');
-    await page.goto('/app/customer');
+  test('chart values match underlying data tables for same range', async ({ page, request }) => {
+    /* Customer home no longer embeds analytics; Shop Admin dashboard owns chart+table pairs. */
+    await loginUi(page, request, 'admin@repairconnect.local');
+    await page.goto('/app/admin');
+    await expect(page.locator('#analytics-range')).toBeVisible({ timeout: 15000 });
     await page.locator('#analytics-range').selectOption('90d');
-    await page.getByRole('button', { name: /refresh|تازہ/i }).click();
-    await expect(page.locator('[data-testid="customer-financial-summary"]')).toBeVisible({
+    await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible({
       timeout: 15000
     });
 
     const charts = page.locator('section[aria-labelledby^="chart-"]');
+    await expect(charts.first()).toBeVisible({ timeout: 15000 });
     const count = await charts.count();
     expect(count).toBeGreaterThan(0);
 
@@ -162,15 +148,6 @@ test.describe('UX acceptance — print, analytics, account switch', () => {
         const valueText = (await rows.nth(r).locator('td').nth(1).innerText()).trim();
         expect(Number.isFinite(Number(valueText))).toBe(true);
       }
-    }
-
-    for (const id of [
-      'completed-repair-value',
-      'actual-customer-spending',
-      'outstanding-balance'
-    ]) {
-      const n = Number(await page.locator(`[data-testid="${id}"]`).innerText());
-      expect(n).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -187,7 +164,7 @@ test.describe('UX acceptance — print, analytics, account switch', () => {
     });
     expect(reg.ok(), await reg.text()).toBeTruthy();
 
-    await loginUi(page, 'customer@repairconnect.local');
+    await loginUi(page, request, 'customer@repairconnect.local');
     await expect(page).toHaveURL(/customer/);
 
     await page.evaluate(() => {
@@ -204,7 +181,7 @@ test.describe('UX acceptance — print, analytics, account switch', () => {
     expect(prefsAfterLogout.prefs).toBeNull();
     expect(prefsAfterLogout.theme).toBeNull();
 
-    await loginUi(page, emailB);
+    await loginUi(page, request, emailB);
     await expect(page).toHaveURL(/customer/);
     await expect(page.getByText(/Customer B UX|Hello/i).first()).toBeVisible();
 

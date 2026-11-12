@@ -42,7 +42,7 @@
   }
 </script>
 
-<section class="space-y-6">
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
   <PageHeader
     title={$t('myReceipts')}
     subtitle={$t('myReceiptsSubtitle')}
@@ -50,18 +50,21 @@
   />
 
   {#if loading}
-    <div class="space-y-2" aria-busy="true">
+    <div class="space-y-2" role="status" aria-busy="true" aria-label={$t('loading')}>
       {#each Array.from({ length: 4 }) as _}<Skeleton class="h-16" />{/each}
     </div>
   {:else if error}
-    <Alert type="error" role="alert" message={error} />
+    <div class="space-y-3">
+      <Alert type="error" role="alert" message={error} />
+      <Button variant="outline" onclick={load}>{$t('retry')}</Button>
+    </div>
   {:else}
-    <ul class="space-y-2">
+    <ul class="space-y-2" role="list">
       {#each docs as doc}
         <li class="surface-card flex flex-wrap items-center justify-between gap-3 p-4">
-          <div>
-            <p class="font-medium">{doc.documentNumber || doc._id}</p>
-            <p class="text-sm text-muted">
+          <div class="min-w-0">
+            <p class="font-medium text-ink">{doc.documentNumber || doc._id}</p>
+            <p class="mt-1 text-sm text-muted">
               {typeLabel(doc.docType)}
               {#if doc.issuedAt}
                 · {new Date(doc.issuedAt).toLocaleString()}
@@ -76,7 +79,9 @@
           </div>
         </li>
       {:else}
-        <li class="text-muted">{$t('noReceiptsYet')}</li>
+        <li class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-8 text-center text-sm text-muted" role="status">
+          {$t('noReceiptsYet')}
+        </li>
       {/each}
     </ul>
   {/if}

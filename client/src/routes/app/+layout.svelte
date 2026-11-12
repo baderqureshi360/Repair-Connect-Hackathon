@@ -16,10 +16,17 @@
       const me = await api<AuthUser & { preferences?: Record<string, unknown> }>('/api/v1/auth/me');
       setSession(me);
       if (me.preferences) applyPreferences(me.preferences as never);
-      pendingOwner = Boolean(me.onboardingPending || me.accountStatus === 'pending_shop_owner');
+      const pendingShop = me.accountStatus === 'pending_shop_owner';
+      const pendingSupplier = me.accountStatus === 'pending_supplier';
+      pendingOwner = Boolean(me.onboardingPending || pendingShop || pendingSupplier);
       const path = $page.url.pathname;
-      if (pendingOwner && !path.startsWith('/app/shop-application')) {
+      if (pendingShop && !path.startsWith('/app/shop-application')) {
         goto('/app/shop-application/status');
+        ready = true;
+        return;
+      }
+      if (pendingSupplier && !path.startsWith('/app/supplier-application')) {
+        goto('/app/supplier-application/status');
         ready = true;
         return;
       }
@@ -27,19 +34,43 @@
         const allowed =
           path.startsWith('/app/platform') ||
           path.startsWith('/app/profile') ||
-          path.startsWith('/app/appearance');
+          path.startsWith('/app/appearance') ||
+          path.startsWith('/app/notifications');
         if (!allowed) {
-          goto('/app/platform/shop-applications');
+          goto('/app/platform');
           ready = true;
           return;
         }
       } else if (path.startsWith('/app/platform')) {
-        goto(me.role === 'shop_admin' ? '/app/admin' : '/app/customer');
+        goto(
+          me.role === 'shop_admin'
+            ? '/app/admin'
+            : me.role === 'supplier'
+              ? '/app/supplier'
+              : '/app/customer'
+        );
         ready = true;
         return;
       }
-      if (!pendingOwner && path.startsWith('/app/shop-application') && me.role === 'shop_admin') {
-        // Approved owners landing on status can continue; leave page as-is.
+      if (me.role === 'supplier' && !pendingSupplier) {
+        const allowed =
+          path.startsWith('/app/supplier') ||
+          path.startsWith('/app/supplier-application') ||
+          path.startsWith('/app/profile') ||
+          path.startsWith('/app/appearance') ||
+          path.startsWith('/app/notifications');
+        if (!allowed) {
+          goto('/app/supplier');
+          ready = true;
+          return;
+        }
+      } else if (path.startsWith('/app/supplier') && me.role !== 'supplier' && !path.startsWith('/app/supplier-application')) {
+        // /app/admin/suppliers is marketplace for shop admins — allow that path separately
+        if (!path.startsWith('/app/admin')) {
+          goto(me.role === 'shop_admin' ? '/app/admin' : '/app/customer');
+          ready = true;
+          return;
+        }
       }
       ready = true;
     } catch {

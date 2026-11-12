@@ -9,6 +9,8 @@
   import StatusPill from '$lib/components/StatusPill.svelte';
   import Modal from '$lib/components/Modal.svelte';
   import Button from '$lib/components/Button.svelte';
+  import UnsavedChangesGuard from '$lib/components/UnsavedChangesGuard.svelte';
+  import { confirmIfDirty } from '$lib/keyboard/unsaved';
   import { toasts } from '$lib/stores/toast';
 
   let detail = $state<any>(null);
@@ -56,9 +58,40 @@
   let reverseReason = $state('');
   let reverseConfirm = $state(false);
 
+  const diagDirty = $derived(Boolean(findings.trim() || recommendedActions.trim()));
+  const estDirty = $derived(Number(laborCost) > 0 || Number(partsCost) > 0);
+  const reverseDirty = $derived(
+    Boolean(reverseReason.trim() || reverseConfirm || Number(reverseAmount) > 0)
+  );
+  const editorDirty = $derived(
+    (showDiag && diagDirty) || (showEst && estDirty) || (showReverse && reverseDirty)
+  );
+
+  function closeDiag() {
+    if (!confirmIfDirty(diagDirty, $t('unsavedChangesWarning'))) return;
+    showDiag = false;
+    findings = '';
+    recommendedActions = '';
+  }
+
+  function closeEst() {
+    if (!confirmIfDirty(estDirty, $t('unsavedChangesWarning'))) return;
+    showEst = false;
+    laborCost = 0;
+    partsCost = 0;
+  }
+
+  function closeReverse() {
+    if (!confirmIfDirty(reverseDirty, $t('unsavedChangesWarning'))) return;
+    showReverse = false;
+    reverseReason = '';
+    reverseConfirm = false;
+    reverseAmount = 0;
+  }
+
   async function load() {
     detail = await api(`/api/v1/repairs/${$page.params.id}`);
-    messages = await api(`/api/v1/repairs/${$page.params.id}/messages`).catch(() => []);
+    messages = await api<any[]>(`/api/v1/repairs/${$page.params.id}/messages`).catch(() => []);
     if ($user?.role === 'shop_admin') {
       const memberships = await api<any[]>(`/api/v1/auth/staff?shopId=${detail.repair.shop._id || detail.repair.shop}`);
       staff = memberships.filter((m) => m.role === 'mechanic');
@@ -273,7 +306,7 @@
       });
       showReverse = false;
       reverseTarget = null;
-      announce($t('reversalSuccess'));
+      announce.set($t('reversalSuccess'));
       toasts.success($t('reversalSuccess'));
       await load();
     });
@@ -281,16 +314,24 @@
 </script>
 
 {#if !detail && !error}
-  <p>{$t('loading')}</p>
+  <p class="text-sm text-muted" role="status">{$t('loading')}</p>
 {:else if error && !detail}
   <Alert type="error" role="alert" message={error} />
 {:else if detail}
   {@const repair = detail.repair}
-  <section class="space-y-6">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-semibold">{repair.referenceNumber}</h1>
-        <p class="text-sm text-muted">{repair.brand} {repair.model} · {repair.deviceType}</p>
+  {@const pendingEstimate =
+    $user?.role === 'customer'
+      ? detail.estimates?.find((est: any) => est.status === 'pending' && repair.status === 'estimate_pending')
+      : null}
+  <section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
+  <UnsavedChangesGuard dirty={editorDirty} />
+    <header class="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+      <div class="min-w-0">
+        <p class="text-xs font-semibold uppercase tracking-wide text-muted">
+          {$user?.role === 'customer' ? $t('myRepairs') : $t('assignedJobs')}
+        </p>
+        <h1 class="mt-1 text-xl font-semibold tracking-tight text-ink md:text-2xl">{repair.referenceNumber}</h1>
+        <p class="mt-1 text-sm text-muted">{repair.brand} {repair.model} · {repair.deviceType}</p>
         {#if detail.readiness}
           <p class="mt-2 text-sm" role="status" data-testid="readiness-message">
             {$user?.role === 'customer' ? detail.readiness.customerMessage : detail.readiness.staffMessage}
@@ -310,28 +351,158 @@
         {/if}
         <StatusPill status={repair.status} />
       </div>
-    </div>
+    </header>
 
     {#if error}<Alert type="error" role="alert" message={error} />{/if}
     {#if message}<Alert type="success" message={message} />{/if}
 
+    {#if $user?.role === 'customer' && (pendingEstimate || detail.customerStatus?.nextAction || detail.readiness?.customerMessage)}
+      <section class="priorities-panel rounded-[var(--radius-ui)] p-4" aria-labelledby="customer-next-action">
+        <h2 id="customer-next-action" class="priorities-title mb-1 text-sm font-semibold">{$t('nextAction')}</h2>
+        <p class="priorities-hint text-xs">
+          {#if pendingEstimate}
+            {$t('reviewEstimates')}
+          {:else if detail.customerStatus?.nextAction}
+            {detail.customerStatus.nextAction}
+          {:else}
+            {detail.readiness?.customerMessage}
+          {/if}
+        </p>
+        {#if pendingEstimate}
+          <div class="mt-3 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="primary"
+              data-testid="approve-estimate"
+              loading={busy}
+              onclick={() =>
+                run(() =>
+                  api(`/api/v1/repairs/estimates/${pendingEstimate._id}/decision`, {
+                    method: 'POST',
+                    body: JSON.stringify({ decision: 'approved' })
+                  }).then(() => undefined)
+                )}
+            >
+              {$t('approve')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              loading={busy}
+              onclick={() => {
+                if (confirm($t('confirmReject'))) {
+                  run(() =>
+                    api(`/api/v1/repairs/estimates/${pendingEstimate._id}/decision`, {
+                      method: 'POST',
+                      body: JSON.stringify({ decision: 'rejected', reason: rejectReason || 'Rejected' })
+                    }).then(() => undefined)
+                  );
+                }
+              }}
+            >
+              {$t('reject')}
+            </Button>
+          </div>
+        {/if}
+      </section>
+    {/if}
+
+    {#if $user?.role === 'mechanic'}
+      {@const canDiagnose = ['assigned', 'diagnosing'].includes(repair.status)}
+      {@const canEstimate = [
+        'diagnosing',
+        'estimate_rejected',
+        'estimate_approved',
+        'awaiting_parts',
+        'parts_reserved',
+        'ready_to_start'
+      ].includes(repair.status)}
+      {@const canRequestParts = [
+        'estimate_approved',
+        'awaiting_parts',
+        'parts_reserved',
+        'ready_to_start',
+        'in_progress'
+      ].includes(repair.status)}
+      {@const startEligibleStatus = [
+        'estimate_approved',
+        'awaiting_parts',
+        'parts_reserved',
+        'ready_to_start'
+      ].includes(repair.status)}
+      {@const canStart = Boolean(detail.readiness?.canStartRepair && startEligibleStatus)}
+      {@const canComplete = repair.status === 'in_progress'}
+      <section class="priorities-panel rounded-[var(--radius-ui)] p-4" aria-labelledby="mechanic-workflow">
+        <h2 id="mechanic-workflow" class="priorities-title mb-1 text-sm font-semibold">{$t('mechanicWorkflowTitle')}</h2>
+        <p class="priorities-hint mb-3 text-xs">{$t('mechanicWorkflowHint')}</p>
+        <ol class="mb-3 list-decimal space-y-1 ps-5 text-sm text-ink">
+          <li class={canDiagnose ? 'font-medium' : 'text-muted'}>{$t('diagnose')}</li>
+          <li class={canEstimate ? 'font-medium' : 'text-muted'}>{$t('estimate')}</li>
+          <li class={canRequestParts ? 'font-medium' : 'text-muted'}>{$t('requestParts')}</li>
+          <li class={canStart ? 'font-medium' : 'text-muted'}>{$t('startWork')}</li>
+          <li class={canComplete ? 'font-medium' : 'text-muted'}>{$t('complete')}</li>
+        </ol>
+        <div class="mt-3 flex flex-wrap gap-2">
+          {#if canDiagnose}
+            <Button size="sm" variant="primary" onclick={() => (showDiag = true)}>{$t('diagnose')}</Button>
+          {/if}
+          {#if canEstimate}
+            <Button size="sm" variant="outline" onclick={() => (showEst = true)}>{$t('estimate')}</Button>
+          {/if}
+          {#if canRequestParts}
+            <Button size="sm" variant="outline" onclick={() => (showParts = true)}>{$t('requestParts')}</Button>
+          {/if}
+          {#if canStart}
+            <Button
+              size="sm"
+              variant="primary"
+              loading={busy}
+              data-testid="start-work"
+              onclick={() =>
+                run(() =>
+                  api(`/api/v1/repairs/${repair._id}/start`, {
+                    method: 'POST',
+                    body: '{}'
+                  }).then(() => undefined)
+                )}
+            >
+              {$t('startWork')}
+            </Button>
+          {:else if startEligibleStatus}
+            <Button size="sm" variant="outline" disabled ariaLabel={$t('startWorkBlocked')}>{$t('startWork')}</Button>
+          {/if}
+          {#if canComplete}
+            <Button size="sm" variant="primary" onclick={() => (showComplete = true)}>{$t('complete')}</Button>
+          {/if}
+        </div>
+        {#if startEligibleStatus && !detail.readiness?.canStartRepair}
+          <div class="mt-3">
+            <Alert
+              type="warning"
+              message={`${$t('actionUnavailable')}: ${$t('startWorkBlocked')}${detail.readiness?.reasons?.length ? ` — ${detail.readiness.reasons.join(' · ')}` : ''}`}
+            />
+          </div>
+        {/if}
+      </section>
+    {/if}
+
     {#if detail.paymentSummary}
-      <article class="surface-card grid gap-2 p-4 sm:grid-cols-4" aria-label="Payment summary">
+      <article class="surface-card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4" aria-label={$t('paymentStatus')}>
         <div>
-          <p class="text-xs uppercase text-muted">Total due</p>
-          <p class="font-semibold">{detail.paymentSummary.totalDue} PKR</p>
+          <p class="text-xs font-medium uppercase tracking-wide text-muted">{$t('totalDue')}</p>
+          <p class="mt-1 font-semibold text-ink">{detail.paymentSummary.totalDue} PKR</p>
         </div>
         <div>
-          <p class="text-xs uppercase text-muted">Paid</p>
-          <p class="font-semibold">{detail.paymentSummary.amountPaid} PKR</p>
+          <p class="text-xs font-medium uppercase tracking-wide text-muted">{$t('amountPaid')}</p>
+          <p class="mt-1 font-semibold text-ink">{detail.paymentSummary.amountPaid} PKR</p>
         </div>
         <div>
-          <p class="text-xs uppercase text-muted">Outstanding</p>
-          <p class="font-semibold">{detail.paymentSummary.outstanding} PKR</p>
+          <p class="text-xs font-medium uppercase tracking-wide text-muted">{$t('outstanding')}</p>
+          <p class="mt-1 font-semibold text-ink">{detail.paymentSummary.outstanding} PKR</p>
         </div>
         <div>
-          <p class="text-xs uppercase text-muted">Status</p>
-          <p class="font-semibold capitalize">{String(detail.paymentSummary.status).replaceAll('_', ' ')}</p>
+          <p class="text-xs font-medium uppercase tracking-wide text-muted">{$t('paymentStatus')}</p>
+          <p class="mt-1 font-semibold capitalize text-ink">{String(detail.paymentSummary.status).replaceAll('_', ' ')}</p>
         </div>
       </article>
     {/if}
@@ -341,6 +512,19 @@
         <h2 class="font-semibold">{$t('problem')}</h2>
         <p class="mt-2 text-sm">{repair.problemDescription}</p>
         <p class="mt-3 text-sm text-muted">{repair.shop?.name} · {repair.customer?.name}</p>
+        {#if $user?.role === 'customer' && repair.shop}
+          <div class="mt-3 rounded-[var(--radius-ui)] bg-surface-muted px-3 py-2 text-sm">
+            <p class="font-medium text-ink">{repair.shop.name}</p>
+            {#if repair.shop.address || repair.shop.city}
+              <p class="text-muted">{[repair.shop.address, repair.shop.city].filter(Boolean).join(' · ')}</p>
+            {/if}
+            {#if repair.shop.phone}
+              <p class="text-muted">
+                <a class="underline" href={`tel:${repair.shop.phone}`}>{repair.shop.phone}</a>
+              </p>
+            {/if}
+          </div>
+        {/if}
         {#if repair.serialNumber}
           <p class="mt-2 text-sm"><strong>{$t('serialNumber')}:</strong> {repair.serialNumber}</p>
         {/if}
@@ -393,14 +577,20 @@
         {/if}
       </article>
 
-      <article class="rounded-lg border border-border bg-surface-elevated p-4">
+      <article class="surface-card p-4">
         <h2 class="font-semibold">{$t('timeline')}</h2>
-        <ol class="mt-3 space-y-2 border-s-2 border-border ps-4">
+        <ol class="mt-3 space-y-3 border-s-2 border-border ps-4" aria-label={$t('timeline')}>
           {#each detail.history as h}
-            <li>
-              <p class="text-sm font-medium">{(h.fromStatus || '—')} → {h.toStatus}</p>
-              <p class="text-xs text-muted">{new Date(h.changedAt).toLocaleString()} · {h.note}</p>
+            <li class="relative">
+              <span
+                class="absolute -start-[1.35rem] top-1.5 size-2.5 rounded-full bg-accent ring-2 ring-[color:var(--color-surface-elevated)]"
+                aria-hidden="true"
+              ></span>
+              <p class="text-sm font-medium text-ink">{(h.fromStatus || '—')} → {h.toStatus}</p>
+              <p class="text-xs text-muted">{new Date(h.changedAt).toLocaleString()}{#if h.note} · {h.note}{/if}</p>
             </li>
+          {:else}
+            <li class="text-sm text-muted" role="status">{$t('empty')}</li>
           {/each}
         </ol>
       </article>
@@ -450,55 +640,26 @@
     </article>
 
     {#if detail.diagnoses?.length}
-      <article class="rounded-lg border border-border bg-surface-elevated p-4">
+      <article class="surface-card p-4">
         <h2 class="font-semibold">{$t('diagnose')}</h2>
         {#each detail.diagnoses as d}
-          <p class="mt-2 text-sm"><strong>{$t('findings')}:</strong> {d.findings}</p>
-          <p class="text-sm"><strong>{$t('recommendedActions')}:</strong> {d.recommendedActions}</p>
+          <div class="mt-3 border-t border-border pt-3 first:border-0 first:pt-0">
+            <p class="text-sm"><strong>{$t('findings')}:</strong> {d.findings}</p>
+            <p class="mt-1 text-sm"><strong>{$t('recommendedActions')}:</strong> {d.recommendedActions}</p>
+          </div>
         {/each}
       </article>
     {/if}
 
     {#if detail.estimates?.length}
-      <article class="rounded-lg border border-border bg-surface-elevated p-4">
+      <article class="surface-card p-4">
         <h2 class="font-semibold">{$t('estimate')}</h2>
         {#each detail.estimates as est}
           <div class="mt-3 border-t border-border pt-3 first:border-0 first:pt-0">
-            <p class="text-sm">v{est.version} · {est.totalCost} PKR · {est.status}</p>
+            <p class="text-sm font-medium text-ink">v{est.version} · {est.totalCost} PKR · {est.status}</p>
             <p class="text-xs text-muted">{$t('laborCost')} {est.laborCost} · {$t('partsCost')} {est.partsCost}</p>
             {#if $user?.role === 'customer' && est.status === 'pending' && repair.status === 'estimate_pending'}
-              <div class="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  class="rounded bg-accent px-3 py-1.5 text-sm text-white"
-                  data-testid="approve-estimate"
-                  onclick={() =>
-                    run(() =>
-                      api(`/api/v1/repairs/estimates/${est._id}/decision`, {
-                        method: 'POST',
-                        body: JSON.stringify({ decision: 'approved' })
-                      }).then(() => undefined)
-                    )}
-                >
-                  {$t('approve')}
-                </button>
-                <button
-                  type="button"
-                  class="rounded border border-border px-3 py-1.5 text-sm"
-                  onclick={() => {
-                    if (confirm($t('confirmReject'))) {
-                      run(() =>
-                        api(`/api/v1/repairs/estimates/${est._id}/decision`, {
-                          method: 'POST',
-                          body: JSON.stringify({ decision: 'rejected', reason: rejectReason || 'Rejected' })
-                        }).then(() => undefined)
-                      );
-                    }
-                  }}
-                >
-                  {$t('reject')}
-                </button>
-              </div>
+              <p class="mt-2 text-xs text-muted">{$t('nextAction')}: {$t('reviewEstimates')}</p>
             {/if}
           </div>
         {/each}
@@ -506,12 +667,13 @@
     {/if}
 
     {#if detail.partsRequests?.length}
-      <article class="rounded-lg border border-border bg-surface-elevated p-4">
+      <article class="surface-card p-4">
         <h2 class="font-semibold">{$t('partsRequests')}</h2>
-        <ul class="mt-2 space-y-2 text-sm">
+        <ul class="mt-2 space-y-2 text-sm" role="list">
           {#each detail.partsRequests as pr}
-            <li>
-              {pr.part?.name || pr.part} · qty {pr.quantityRequested} · {pr.status}
+            <li class="rounded-[var(--radius-ui)] border border-border px-3 py-2">
+              <span class="font-medium text-ink">{pr.part?.name || pr.part}</span>
+              · qty {pr.quantityRequested} · {pr.status}
               {#if pr.quantityShortage}
                 · {$t('shortage')}: {pr.quantityShortage}
               {/if}
@@ -657,17 +819,20 @@
     {/if}
 
     {#if $user?.role === 'customer' && detail.paymentSummary?.payments?.length}
-      <article class="surface-card space-y-3 p-4">
-        <h2 class="font-semibold">Payment history</h2>
-        <ul class="space-y-2 text-sm">
+      <article class="surface-card space-y-3 p-4" aria-labelledby="customer-payment-history">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="customer-payment-history" class="font-semibold">{$t('customerPaymentHistory')}</h2>
+          <Button size="sm" variant="outline" href="/app/customer/receipts">{$t('viewAllReceipts')}</Button>
+        </div>
+        <ul class="space-y-2 text-sm" role="list">
           {#each detail.paymentSummary.payments as p}
-            <li class="rounded border border-border p-2">
-              {p.paymentNumber} · {p.amount} PKR · {p.method}
+            <li class="rounded-[var(--radius-ui)] border border-border px-3 py-2">
+              <span class="font-medium text-ink">{p.paymentNumber}</span>
+              · {p.amount} PKR · {p.method}
               {#if p.paidAt} · {new Date(p.paidAt).toLocaleString()}{/if}
             </li>
           {/each}
         </ul>
-        <Button variant="outline" href="/app/customer/receipts">{$t('myReceipts')}</Button>
       </article>
     {/if}
 
@@ -691,13 +856,13 @@
       {#if $user?.role === 'shop_admin' && ['submitted', 'assigned'].includes(repair.status)}
         <Button variant="outline" onclick={() => (showAssign = true)}>{$t('assign')}</Button>
       {/if}
-      {#if ($user?.role === 'mechanic' || $user?.role === 'shop_admin') && ['assigned', 'diagnosing'].includes(repair.status)}
+      {#if $user?.role === 'shop_admin' && ['assigned', 'diagnosing'].includes(repair.status)}
         <Button variant="outline" onclick={() => (showDiag = true)}>{$t('diagnose')}</Button>
       {/if}
-      {#if ($user?.role === 'mechanic' || $user?.role === 'shop_admin') && ['diagnosing', 'estimate_rejected', 'estimate_approved', 'awaiting_parts', 'parts_reserved', 'ready_to_start'].includes(repair.status)}
+      {#if $user?.role === 'shop_admin' && ['diagnosing', 'estimate_rejected', 'estimate_approved', 'awaiting_parts', 'parts_reserved', 'ready_to_start'].includes(repair.status)}
         <Button variant="outline" onclick={() => (showEst = true)}>{$t('estimate')}</Button>
       {/if}
-      {#if ($user?.role === 'mechanic' || $user?.role === 'shop_admin') && ['estimate_approved', 'awaiting_parts', 'parts_reserved', 'ready_to_start', 'in_progress'].includes(repair.status)}
+      {#if $user?.role === 'shop_admin' && ['estimate_approved', 'awaiting_parts', 'parts_reserved', 'ready_to_start', 'in_progress'].includes(repair.status)}
         <Button variant="outline" onclick={() => (showParts = true)}>{$t('requestParts')}</Button>
       {/if}
       {#if ($user?.role === 'mechanic' || $user?.role === 'shop_admin') && (detail.readiness?.partsRequirementStatus === 'undetermined' || !detail.readiness?.partsRequirementDetermined) && ['estimate_approved', 'awaiting_parts', 'parts_reserved', 'ready_to_start'].includes(repair.status)}
@@ -716,17 +881,20 @@
           Confirm no parts required
         </Button>
       {/if}
-      {#if ($user?.role === 'mechanic' || $user?.role === 'shop_admin') && detail.readiness?.canStartRepair && ['estimate_approved', 'awaiting_parts', 'parts_reserved', 'ready_to_start'].includes(repair.status)}
+      {#if $user?.role === 'shop_admin' && detail.readiness?.canStartRepair && ['estimate_approved', 'awaiting_parts', 'parts_reserved', 'ready_to_start'].includes(repair.status)}
         <Button
           variant="outline"
           loading={busy}
           data-testid="start-work"
-          onclick={() => run(() => api(`/api/v1/repairs/${repair._id}/start`, { method: 'POST' }).then(() => undefined))}
+          onclick={() =>
+            run(() =>
+              api(`/api/v1/repairs/${repair._id}/start`, { method: 'POST', body: '{}' }).then(() => undefined)
+            )}
         >
           {$t('startWork')}
         </Button>
       {/if}
-      {#if ($user?.role === 'mechanic' || $user?.role === 'shop_admin') && repair.status === 'in_progress'}
+      {#if $user?.role === 'shop_admin' && repair.status === 'in_progress'}
         <Button onclick={() => (showComplete = true)}>{$t('complete')}</Button>
       {/if}
       {#if ['shop_admin', 'parts_coordinator', 'mechanic'].includes($user?.role || '') && repair.status === 'ready_for_collection' && !repair.collectedAt}
@@ -780,7 +948,7 @@
     </button>
   </Modal>
 
-  <Modal open={showDiag} title={$t('diagnose')} onclose={() => (showDiag = false)}>
+  <Modal open={showDiag} title={$t('diagnose')} onclose={closeDiag}>
     <label class="mb-1 block text-sm" for="findings">{$t('findings')}</label>
     <textarea id="findings" class="mb-3 w-full rounded border border-border px-2 py-2" rows="3" bind:value={findings}></textarea>
     <label class="mb-1 block text-sm" for="actions">{$t('recommendedActions')}</label>
@@ -793,14 +961,18 @@
           api(`/api/v1/repairs/${repair._id}/diagnosis`, {
             method: 'POST',
             body: JSON.stringify({ findings, recommendedActions })
-          }).then(() => undefined)
+          }).then(() => {
+            findings = '';
+            recommendedActions = '';
+            showDiag = false;
+          })
         )}
     >
       {$t('save')}
     </button>
   </Modal>
 
-  <Modal open={showEst} title={$t('estimate')} onclose={() => (showEst = false)}>
+  <Modal open={showEst} title={$t('estimate')} onclose={closeEst}>
     <label class="mb-1 block text-sm" for="labor">{$t('laborCost')}</label>
     <input id="labor" type="number" min="0" class="mb-3 w-full rounded border border-border px-2 py-2" bind:value={laborCost} />
     <label class="mb-1 block text-sm" for="pcost">{$t('partsCost')}</label>
@@ -813,7 +985,11 @@
           api(`/api/v1/repairs/${repair._id}/estimates`, {
             method: 'POST',
             body: JSON.stringify({ laborCost: Number(laborCost), partsCost: Number(partsCost) })
-          }).then(() => undefined)
+          }).then(() => {
+            laborCost = 0;
+            partsCost = 0;
+            showEst = false;
+          })
         )}
     >
       {$t('submit')}
@@ -870,7 +1046,7 @@
     </button>
   </Modal>
 
-  <Modal open={showReverse} title={$t('reversePayment')} onclose={() => (showReverse = false)}>
+  <Modal open={showReverse} title={$t('reversePayment')} onclose={closeReverse}>
     {#if reverseTarget}
       <p class="mb-2 text-sm">
         {$t('originalPayment')}: {reverseTarget.amount} PKR

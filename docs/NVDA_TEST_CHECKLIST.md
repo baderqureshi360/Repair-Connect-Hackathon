@@ -55,6 +55,22 @@ Axe-core + keyboard Playwright coverage exists; that is **not** a substitute for
 |----|----------|-------------|------------|
 | — | — | None logged yet (NVDA not run) | — |
 
+## Keyboard-only (companion to NVDA)
+
+No mouse. Tab / Shift+Tab / Enter / Space / Escape.
+
+| # | Step | Expected | Result | Notes |
+|---|------|----------|--------|-------|
+| K1 | Login form | Focus order email → password → Sign in; Enter submits | Pending | |
+| K2 | Skip link | Lands in `#main` | Pending | |
+| K3 | Customer repair open/back | Focus remains sensible; no trap | Pending | |
+| K4 | Estimate approve/reject | Controls reachable and activatable | Pending | |
+| K5 | Admin staff dialogs | Escape closes; focus returns | Pending | |
+| K6 | Focus visibility | Outline/ring visible every stop | Pending | |
+| K7 | Mobile nav (360px) | Menu open/close fully keyboard operable | Pending | |
+
+Full acceptance form: `docs/MANUAL_ACCEPTANCE_CHECKLIST.md`.
+
 ## Related automated coverage (not NVDA)
 
 - Playwright axe + keyboard: `client/tests/a11y.spec.ts`, `portals.a11y.spec.ts`

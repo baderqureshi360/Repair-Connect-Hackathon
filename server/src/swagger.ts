@@ -44,6 +44,7 @@ export const swaggerSpec = swaggerJsdoc({
       { name: 'Reports' },
       { name: 'Public' },
       { name: 'ShopApplications' },
+      { name: 'SupplierNetwork' },
       { name: 'Provisioning' },
       { name: 'Platform' }
     ],
@@ -100,7 +101,11 @@ export const swaggerSpec = swaggerJsdoc({
         patch: { tags: ['Auth'], summary: 'Update preferred language (en|ur)' }
       },
       '/api/v1/auth/staff': {
-        get: { tags: ['Auth'], summary: 'List staff for admin shop' },
+        get: {
+          tags: ['Auth'],
+          summary:
+            'List staff for authorized shops (array by default; ?view=manage returns {staff,stats})'
+        },
         post: {
           tags: ['Auth'],
           summary: 'Create staff user + shop membership (shop_admin only)',
@@ -108,6 +113,22 @@ export const swaggerSpec = swaggerJsdoc({
             '201': { description: 'Staff created' },
             '403': { description: 'Forbidden' }
           }
+        }
+      },
+      '/api/v1/auth/staff/{membershipId}': {
+        get: { tags: ['Auth'], summary: 'Staff membership detail (shop_admin)' },
+        patch: { tags: ['Auth'], summary: 'Update staff profile/role/shop (shop_admin)' }
+      },
+      '/api/v1/auth/staff/{membershipId}/status': {
+        post: {
+          tags: ['Auth'],
+          summary: 'Activate or soft-deactivate staff membership (shop_admin)'
+        }
+      },
+      '/api/v1/auth/staff/{membershipId}/reset-password': {
+        post: {
+          tags: ['Auth'],
+          summary: 'Admin-issued temporary password + optional invite token'
         }
       },
       '/api/v1/shops': {
@@ -418,6 +439,146 @@ export const swaggerSpec = swaggerJsdoc({
           tags: ['Platform'],
           summary: 'Reject application (reason required, min 5 chars); records reviewer + audit'
         }
+      },
+      '/api/v1/public/supplier-applications/register': {
+        post: {
+          tags: ['SupplierNetwork'],
+          security: [],
+          summary: 'Register supplier account (pending_supplier) + supplier application'
+        }
+      },
+      '/api/v1/supplier-applications/mine': {
+        get: {
+          tags: ['SupplierNetwork'],
+          summary: 'Current supplier application status (supplier role)'
+        }
+      },
+      '/api/v1/platform/supplier-applications': {
+        get: {
+          tags: ['Platform'],
+          summary:
+            'List supplier applications for platform_operator (pending|approved|rejected|suspended|all)'
+        }
+      },
+      '/api/v1/platform/supplier-applications/{publicId}/approve': {
+        post: {
+          tags: ['Platform'],
+          summary: 'Approve supplier: create SupplierBusiness; records reviewer + audit'
+        }
+      },
+      '/api/v1/platform/supplier-applications/{publicId}/reject': {
+        post: {
+          tags: ['Platform'],
+          summary: 'Reject supplier application (reason required)'
+        }
+      },
+      '/api/v1/platform/supplier-applications/{publicId}/suspend': {
+        post: {
+          tags: ['Platform'],
+          summary: 'Suspend approved supplier (hidden from marketplace)'
+        }
+      },
+      '/api/v1/platform/supplier-applications/{publicId}/reactivate': {
+        post: {
+          tags: ['Platform'],
+          summary: 'Reactivate suspended supplier'
+        }
+      },
+      '/api/v1/marketplace/suppliers': {
+        get: {
+          tags: ['SupplierNetwork'],
+          summary: 'City-based supplier marketplace for shop_admin'
+        }
+      },
+      '/api/v1/marketplace/suppliers/{id}': {
+        get: {
+          tags: ['SupplierNetwork'],
+          summary: 'Approved supplier profile + catalog for shop_admin'
+        }
+      },
+      '/api/v1/supplier/me': {
+        get: {
+          tags: ['SupplierNetwork'],
+          summary: 'Supplier portal business profile'
+        }
+      },
+      '/api/v1/supplier/catalog': {
+        get: {
+          tags: ['SupplierNetwork'],
+          summary: 'List supplier catalog items (search/filter/pagination)'
+        },
+        post: {
+          tags: ['SupplierNetwork'],
+          summary: 'Create catalog item with optional initial stock'
+        }
+      },
+      '/api/v1/supplier/catalog/{id}': {
+        get: { tags: ['SupplierNetwork'], summary: 'Get owned catalog item' },
+        patch: { tags: ['SupplierNetwork'], summary: 'Update owned catalog item' },
+        delete: { tags: ['SupplierNetwork'], summary: 'Permanently delete archived item' }
+      },
+      '/api/v1/supplier/catalog/{id}/stock': {
+        post: {
+          tags: ['SupplierNetwork'],
+          summary: 'Adjust stock with optimistic concurrency (expectedQuantity/version)'
+        }
+      },
+      '/api/v1/supplier/catalog/{id}/archive': {
+        post: { tags: ['SupplierNetwork'], summary: 'Archive catalog item (hidden from marketplace)' }
+      },
+      '/api/v1/marketplace/suppliers/products': {
+        get: {
+          tags: ['SupplierNetwork'],
+          summary: 'Search products from approved suppliers serving a city'
+        }
+      },
+      '/api/v1/supplier-network/conversations': {
+        get: { tags: ['SupplierNetwork'], summary: 'List shop/supplier conversations' },
+        post: { tags: ['SupplierNetwork'], summary: 'Start conversation (shop_admin)' }
+      },
+      '/api/v1/supplier-network/rfqs': {
+        get: { tags: ['SupplierNetwork'], summary: 'List RFQs for shop or supplier' },
+        post: { tags: ['SupplierNetwork'], summary: 'Create RFQ (shop_admin)' }
+      },
+      '/api/v1/supplier-network/rfqs/{id}/compare': {
+        get: { tags: ['SupplierNetwork'], summary: 'Compare quotations side-by-side (shop_admin)' }
+      },
+      '/api/v1/supplier-network/rfqs/{id}/accept': {
+        post: {
+          tags: ['SupplierNetwork'],
+          summary: 'Accept a quotation in a transaction (shop_admin)'
+        }
+      },
+      '/api/v1/supplier-network/rfqs/{id}/quotations': {
+        post: { tags: ['SupplierNetwork'], summary: 'Submit/revise quotation (supplier)' }
+      },
+      '/api/v1/supplier-network/purchase-orders': {
+        get: { tags: ['SupplierNetwork'], summary: 'List purchase orders (shop or supplier)' },
+        post: {
+          tags: ['SupplierNetwork'],
+          summary: 'Create PO from accepted quotation (shop_admin)'
+        }
+      },
+      '/api/v1/supplier-network/purchase-orders/{id}/issue': {
+        post: { tags: ['SupplierNetwork'], summary: 'Issue a draft PO (shop_admin)' }
+      },
+      '/api/v1/supplier-network/purchase-orders/{id}/acknowledge': {
+        post: { tags: ['SupplierNetwork'], summary: 'Acknowledge PO (supplier)' }
+      },
+      '/api/v1/supplier-network/shipments': {
+        post: { tags: ['SupplierNetwork'], summary: 'Create/dispatch shipment (supplier)' }
+      },
+      '/api/v1/supplier-network/goods-receipts': {
+        post: {
+          tags: ['SupplierNetwork'],
+          summary: 'Post GRN and update shop inventory transactionally'
+        }
+      },
+      '/api/v1/supplier-network/ledger/payments': {
+        post: { tags: ['SupplierNetwork'], summary: 'Record supplier payment (shop_admin)' }
+      },
+      '/api/v1/supplier-network/purchasing-reports': {
+        get: { tags: ['SupplierNetwork'], summary: 'Shop-scoped purchasing reports' }
       },
       '/api/v1/repairs/{id}/messages': {
         get: {

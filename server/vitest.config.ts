@@ -5,6 +5,8 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./src/tests/setup.ts'],
+    // Cap workers — parallel mongodb-memory-server replica sets on Windows contend for locks.
+    maxWorkers: 4,
     testTimeout: 60000,
     hookTimeout: 120000,
     env: {

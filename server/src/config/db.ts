@@ -44,7 +44,13 @@ export async function connectDb(): Promise<{ uri: string; mode: 'atlas' | 'memor
   }
 
   mongoose.set('strictQuery', true);
-  await mongoose.connect(uri, { dbName: 'repairconnect' });
+  // Fail loudly instead of hanging forever when Atlas/DNS is unreachable (local Vite proxy then ECONNREFUSED).
+  await mongoose.connect(uri, {
+    dbName: 'repairconnect',
+    serverSelectionTimeoutMS: 20_000,
+    connectTimeoutMS: 20_000
+  });
+  console.log(`[db] Connected (${mode})`);
   return { uri, mode };
 }
 

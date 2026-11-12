@@ -17,7 +17,10 @@ function isTransientTxnError(err: unknown): boolean {
   if ([...labels].some((l) => TRANSIENT.has(l))) return true;
   const code = (err as { code?: number }).code;
   // 112 = WriteConflict
-  return code === 112;
+  if (code === 112) return true;
+  const msg = String((err as Error)?.message || err || '');
+  // mongodb-memory-server under parallel Vitest workers can briefly fail lock acquisition
+  return /Unable to acquire \w+ lock/i.test(msg) || /LockTimeout/i.test(msg);
 }
 
 function isTransactionUnsupported(err: unknown): boolean {

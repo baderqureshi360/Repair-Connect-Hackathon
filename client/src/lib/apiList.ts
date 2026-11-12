@@ -1,6 +1,6 @@
 import { clearSession, getCsrfToken, syncCsrfFromCookie } from './stores/auth';
 import { online } from './stores/ui';
-import { ApiError } from './api';
+import { ApiError, messageFromFailedResponse, statusToErrorCode, type ApiErrorBody } from './api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -23,15 +23,21 @@ export async function apiList<T>(path: string): Promise<{ data: T[]; meta?: unkn
     throw new ApiError('Network error', 0, 'NETWORK');
   }
   online.set(true);
-  const body = await res.json().catch(() => ({}));
+  const contentType = res.headers.get('content-type') || '';
+  let body: ApiErrorBody & { meta?: unknown } = {};
+  if (contentType.includes('application/json')) {
+    body = (await res.json().catch(() => ({}))) as ApiErrorBody & { meta?: unknown };
+  } else {
+    await res.text().catch(() => '');
+  }
   if (res.status === 401) clearSession();
   if (!res.ok || body.success === false) {
     throw new ApiError(
-      body?.error?.message || 'Request failed',
+      messageFromFailedResponse(res, body),
       res.status,
-      body?.error?.code || 'ERROR',
+      body?.error?.code || statusToErrorCode(res.status),
       body?.error?.details
     );
   }
-  return { data: body.data as T[], meta: body.meta };
+  return { data: (body.data as unknown as T[]) || [], meta: body.meta };
 }

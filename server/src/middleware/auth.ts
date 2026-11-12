@@ -8,7 +8,7 @@ import { AppError } from '../utils/errors.js';
 import { fail } from '../utils/response.js';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '../utils/cookies.js';
 
-export type AccountStatus = 'active' | 'pending_shop_owner';
+export type AccountStatus = 'active' | 'pending_shop_owner' | 'pending_supplier';
 
 export interface AuthUser {
   id: string;
@@ -21,18 +21,23 @@ export interface AuthUser {
   accountStatus?: AccountStatus;
 }
 
-const PENDING_OWNER_ALLOWLIST = [
+const PENDING_ACCOUNT_ALLOWLIST = [
   /^\/api\/v1\/auth\/me$/,
   /^\/api\/v1\/auth\/logout$/,
   /^\/api\/v1\/auth\/refresh$/,
   /^\/api\/v1\/auth\/csrf$/,
   /^\/api\/v1\/auth\/me\/password$/,
-  /^\/api\/v1\/shop-applications\/mine$/
+  /^\/api\/v1\/shop-applications\/mine$/,
+  /^\/api\/v1\/supplier-applications\/mine$/
 ];
 
-function isPendingOwnerAllowed(originalUrl: string): boolean {
+function isPendingAccountAllowed(originalUrl: string): boolean {
   const path = originalUrl.split('?')[0];
-  return PENDING_OWNER_ALLOWLIST.some((re) => re.test(path));
+  return PENDING_ACCOUNT_ALLOWLIST.some((re) => re.test(path));
+}
+
+function isPendingOnboarding(status?: AccountStatus): boolean {
+  return status === 'pending_shop_owner' || status === 'pending_supplier';
 }
 
 declare global {
@@ -47,6 +52,8 @@ interface JwtPayload {
   sub: string;
   role: Role;
   typ?: 'access' | 'refresh';
+  sid?: string;
+  fid?: string;
 }
 
 function readAccessToken(req: Request): string | null {
@@ -83,17 +90,14 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       accountStatus
     };
 
-    // Pending shop owners may authenticate but cannot use operational APIs.
-    if (
-      (req.user.accountStatus || 'active') === 'pending_shop_owner' &&
-      !isPendingOwnerAllowed(req.originalUrl)
-    ) {
-      return fail(
-        res,
-        'Your shop application is pending approval. You can only view application status until approved.',
-        403,
-        'ONBOARDING_PENDING'
-      );
+    // Pending shop owners / suppliers may authenticate but cannot use operational APIs.
+    const status = req.user.accountStatus || 'active';
+    if (isPendingOnboarding(status) && !isPendingAccountAllowed(req.originalUrl)) {
+      const message =
+        status === 'pending_supplier'
+          ? 'Your supplier application is pending approval. You can only view application status until approved.'
+          : 'Your shop application is pending approval. You can only view application status until approved.';
+      return fail(res, message, 403, 'ONBOARDING_PENDING');
     }
 
     next();
@@ -145,6 +149,10 @@ export function signAccessToken(userId: string, role: Role): string {
   });
 }
 
+/**
+ * @deprecated Prefer createRefreshSession() — refresh JWTs must include sid/fid
+ * and be registered server-side. Kept only for transitional imports.
+ */
 export function signRefreshToken(userId: string, role: Role): string {
   return jwt.sign({ sub: userId, role, typ: 'refresh' }, env.jwtSecret, {
     expiresIn: env.refreshTokenTtlSec

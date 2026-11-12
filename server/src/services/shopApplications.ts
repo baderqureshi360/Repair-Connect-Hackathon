@@ -9,6 +9,7 @@ import {
 import { RepairShop, ShopMembership, User } from '../models/index.js';
 import { AppError } from '../utils/errors.js';
 import { writeAudit } from './audit.js';
+import { withMongoTransaction } from '../utils/mongoTransaction.js';
 import { isServiceCategoryId, type ServiceCategoryId } from '../constants/serviceCategories.js';
 
 function publicApplicationId() {
@@ -102,14 +103,8 @@ export async function registerShopOwnerApplication(input: {
 
   const passwordHash = await bcrypt.hash(input.password, 12);
   const publicId = publicApplicationId();
-  const session = await mongoose.startSession();
 
-  let ownerId: mongoose.Types.ObjectId | undefined;
-  let applicationId: mongoose.Types.ObjectId | undefined;
-
-  try {
-    session.startTransaction();
-
+  const created = await withMongoTransaction(async (session) => {
     const [owner] = await User.create(
       [
         {
@@ -153,16 +148,13 @@ export async function registerShopOwnerApplication(input: {
       { session }
     );
 
-    await session.commitTransaction();
-    ownerId = owner._id;
-    applicationId = app._id;
-
     await writeAudit({
       actor: owner._id,
       action: 'shop_application.register',
       entityType: 'ShopApplication',
       entityId: app._id,
-      details: { publicId, email: ownerEmail, ip: input.ip }
+      details: { publicId, email: ownerEmail, ip: input.ip },
+      session
     });
 
     return {
@@ -170,17 +162,14 @@ export async function registerShopOwnerApplication(input: {
       status: 'pending_review' as const,
       shopName: app.shopName,
       submittedAt: app.createdAt,
-      ownerId,
-      applicationId,
+      ownerId: owner._id,
+      applicationId: app._id,
       nextSteps: nextStepsFor('pending_review'),
       loginHint: 'Sign in with your email and password to track application status.'
     };
-  } catch (err) {
-    await session.abortTransaction().catch(() => undefined);
-    throw err;
-  } finally {
-    session.endSession();
-  }
+  });
+
+  return created;
 }
 
 /** Legacy public create without account — kept for historical compatibility; no credentials. */

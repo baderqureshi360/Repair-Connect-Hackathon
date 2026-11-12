@@ -22,7 +22,23 @@ export { DocumentSequence } from './DocumentSequence.js';
 export { PaymentRecord } from './PaymentRecord.js';
 export { FinancialDocument } from './FinancialDocument.js';
 export { PasswordReset } from './PasswordReset.js';
+export { RefreshSession } from './RefreshSession.js';
 export { ShopApplication } from './ShopApplication.js';
+export { SupplierApplication } from './SupplierApplication.js';
+export { SupplierBusiness } from './SupplierBusiness.js';
+export { SupplierCatalogItem } from './SupplierCatalogItem.js';
+export { SupplierStockMovement } from './SupplierStockMovement.js';
+export { SupplierReview } from './SupplierReview.js';
+export {
+  SupplierConversation,
+  SupplierConversationMessage
+} from './SupplierConversation.js';
+export { SupplierRfq } from './SupplierRfq.js';
+export { SupplierQuotation } from './SupplierQuotation.js';
+export { SupplierPurchaseOrder } from './SupplierPurchaseOrder.js';
+export { SupplierShipment } from './SupplierShipment.js';
+export { GoodsReceipt } from './GoodsReceipt.js';
+export { SupplierLedgerEntry } from './SupplierLedgerEntry.js';
 export { RepairTrackingEvent } from './RepairTrackingEvent.js';
 export { RepairMessage } from './RepairMessage.js';
 export { OutboxEvent } from './OutboxEvent.js';

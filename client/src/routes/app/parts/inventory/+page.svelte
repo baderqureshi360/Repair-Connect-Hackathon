@@ -11,6 +11,8 @@
   import Button from '$lib/components/Button.svelte';
   import StatGrid from '$lib/components/StatGrid.svelte';
   import Skeleton from '$lib/components/Skeleton.svelte';
+  import UnsavedChangesGuard from '$lib/components/UnsavedChangesGuard.svelte';
+  import { confirmIfDirty } from '$lib/keyboard/unsaved';
 
   let parts = $state<any[]>([]);
   let movements = $state<any[]>([]);
@@ -28,6 +30,33 @@
   let adjustDelta = $state(0);
   let adjustReason = $state('');
   let search = $state('');
+
+  const adjustDirty = $derived(showAdjust && (Number(adjustDelta) !== 0 || Boolean(adjustReason.trim())));
+  const stockDirty = $derived(showStock && Number(stockQty) > 0);
+  const inventoryEditorDirty = $derived(adjustDirty || stockDirty || showEdit || showCreate);
+
+  function closeAdjust() {
+    if (!confirmIfDirty(adjustDirty, $t('unsavedChangesWarning'))) return;
+    showAdjust = false;
+    adjustDelta = 0;
+    adjustReason = '';
+  }
+
+  function closeStock() {
+    if (!confirmIfDirty(stockDirty, $t('unsavedChangesWarning'))) return;
+    showStock = false;
+    stockQty = 1;
+  }
+
+  function closeEdit() {
+    if (!confirmIfDirty(showEdit, $t('unsavedChangesWarning'))) return;
+    showEdit = false;
+  }
+
+  function closeCreate() {
+    if (!confirmIfDirty(showCreate, $t('unsavedChangesWarning'))) return;
+    showCreate = false;
+  }
   let stockFilter = $state<'all' | 'low' | 'out' | 'ok'>('all');
   let category = $state('');
 
@@ -67,7 +96,15 @@
     }
   }
 
-  onMount(load);
+  onMount(async () => {
+    await load();
+    const focus = $page.url.searchParams.get('focus');
+    if (focus) {
+      requestAnimationFrame(() => {
+        document.getElementById(`part-${focus}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    }
+  });
 
   const filtered = $derived(
     parts.filter((p) => {
@@ -168,53 +205,64 @@
   }
 </script>
 
-<section class="space-y-4">
-  <PageHeader title={$t('inventory')} subtitle="Shop-scoped parts, stock operations, and movement history.">
-    <Button variant="outline" href="/app/parts/transfers">{$t('transfers')}</Button>
-    <Button variant="outline" onclick={() => (showMovements = true)}>{$t('movements')}</Button>
-    <Button onclick={() => (showCreate = true)}>{$t('createPart')}</Button>
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
+  <UnsavedChangesGuard dirty={inventoryEditorDirty} />
+  <PageHeader
+    title={$t('inventory')}
+    subtitle={$t('inventorySubtitle')}
+    breadcrumbs={[{ label: $t('home'), href: '/app/parts' }, { label: $t('inventory') }]}
+  >
+    <Button variant="outline" size="sm" href="/app/parts/transfers">{$t('transfers')}</Button>
+    <Button variant="outline" size="sm" onclick={() => (showMovements = true)}>{$t('movements')}</Button>
+    <Button size="sm" onclick={() => (showCreate = true)}>{$t('createPart')}</Button>
   </PageHeader>
 
   {#if error}<Alert type="error" role="alert" message={error} />{/if}
   {#if message}<Alert type="success" message={message} />{/if}
 
   {#if loading}
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      {#each Array.from({ length: 5 }) as _}<Skeleton class="h-24" />{/each}
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" role="status" aria-busy="true" aria-label={$t('loading')}>
+      {#each Array.from({ length: 6 }) as _}<Skeleton class="h-24" />{/each}
     </div>
   {:else}
     <StatGrid
       stats={[
-        { label: 'Active parts', value: stats.active, icon: 'package', tone: 'indigo' },
-        { label: $t('available'), value: stats.available, icon: 'checkCircle', tone: 'green' },
+        { label: $t('activeParts'), value: stats.active, icon: 'package', tone: 'primary' },
+        { label: $t('available'), value: stats.available, icon: 'checkCircle', tone: 'green', hint: $t('availableVsReserved') },
         { label: $t('reserved'), value: stats.reserved, icon: 'clipboard', tone: 'blue' },
+        {
+          label: $t('totalOnHand'),
+          value: stats.available + stats.reserved,
+          icon: 'package',
+          tone: 'violet'
+        },
         { label: $t('lowStock'), value: stats.low, icon: 'alertTriangle', tone: 'amber' },
         { label: $t('outOfStock'), value: stats.out, icon: 'alertTriangle', tone: 'red' },
         { label: $t('partsRequests'), value: pendingRequests, icon: 'clock', tone: 'violet' }
       ]}
     />
 
-    <div class="flex flex-wrap gap-2">
+    <div class="surface-card flex flex-wrap gap-2 p-4">
       <input
         class="input-field max-w-xs"
         type="search"
-        placeholder="Search SKU or name"
-        aria-label="Search inventory by SKU or name"
+        placeholder={$t('searchInventory')}
+        aria-label={$t('searchInventory')}
         bind:value={search}
       />
-      <select class="input-field w-auto" aria-label="Filter by stock status" bind:value={stockFilter}>
-        <option value="all">All stock</option>
-        <option value="ok">In stock</option>
-        <option value="low">Low stock</option>
-        <option value="out">Out of stock</option>
+      <select class="input-field w-auto" aria-label={$t('filterStatus')} bind:value={stockFilter}>
+        <option value="all">{$t('allStock')}</option>
+        <option value="ok">{$t('inStock')}</option>
+        <option value="low">{$t('lowStock')}</option>
+        <option value="out">{$t('outOfStock')}</option>
       </select>
-      <select class="input-field w-auto" aria-label="Filter by category" bind:value={category}>
-        <option value="">All categories</option>
+      <select class="input-field w-auto" aria-label={$t('allCategories')} bind:value={category}>
+        <option value="">{$t('allCategories')}</option>
         {#each categories as c}<option value={c}>{c}</option>{/each}
       </select>
     </div>
 
-    <div class="overflow-x-auto rounded-xl border border-border bg-surface-elevated">
+    <div class="overflow-x-auto rounded-[var(--radius-ui)] border border-border bg-surface-elevated">
       <table class="min-w-full text-sm">
         <caption class="sr-only">{$t('inventory')}</caption>
         <thead class="border-b border-border text-start">
@@ -224,6 +272,7 @@
             <th class="px-3 py-2" scope="col">Category</th>
             <th class="px-3 py-2" scope="col">{$t('available')}</th>
             <th class="px-3 py-2" scope="col">{$t('reserved')}</th>
+            <th class="px-3 py-2" scope="col">{$t('totalOnHand')}</th>
             <th class="px-3 py-2" scope="col">{$t('reorderLevel')}</th>
             <th class="px-3 py-2" scope="col">{$t('unitCost')}</th>
             <th class="px-3 py-2" scope="col">{$t('supplier')}</th>
@@ -243,24 +292,25 @@
                 {/if}
               </td>
               <td class="px-3 py-2">{p.category || 'general'}</td>
-              <td class="px-3 py-2 tabular-nums">{p.quantityAvailable}</td>
-              <td class="px-3 py-2 tabular-nums">{p.quantityReserved}</td>
+              <td class="px-3 py-2 tabular-nums font-medium text-ink">{p.quantityAvailable}</td>
+              <td class="px-3 py-2 tabular-nums text-muted">{p.quantityReserved || 0}</td>
+              <td class="px-3 py-2 tabular-nums">{(p.quantityAvailable || 0) + (p.quantityReserved || 0)}</td>
               <td class="px-3 py-2 tabular-nums">{p.reorderLevel}</td>
               <td class="px-3 py-2 tabular-nums">{p.unitCost}</td>
               <td class="px-3 py-2">{p.supplier || '—'}</td>
               <td class="px-3 py-2">
                 <div class="flex flex-wrap gap-2">
-                  <button type="button" class="text-accent underline" onclick={() => { selectedId = p._id; showStock = true; }}>{$t('stockIn')}</button>
-                  <button type="button" class="text-accent underline" onclick={() => { selectedId = p._id; showAdjust = true; }}>{$t('adjustStock')}</button>
-                  <button type="button" class="text-accent underline" onclick={() => { editForm = { ...p }; showEdit = true; }}>Edit</button>
+                  <Button size="sm" variant="ghost" onclick={() => { selectedId = p._id; showStock = true; }}>{$t('stockIn')}</Button>
+                  <Button size="sm" variant="ghost" onclick={() => { selectedId = p._id; showAdjust = true; }}>{$t('adjustStock')}</Button>
+                  <Button size="sm" variant="ghost" onclick={() => { editForm = { ...p }; showEdit = true; }}>Edit</Button>
                   {#if p.isActive !== false}
-                    <button type="button" class="text-danger underline" onclick={() => deactivate(p)}>Archive</button>
+                    <Button size="sm" variant="ghost" class="text-danger" onclick={() => deactivate(p)}>Archive</Button>
                   {/if}
                 </div>
               </td>
             </tr>
           {:else}
-            <tr><td class="px-3 py-4 text-muted" colspan="9">{$t('empty')}</td></tr>
+            <tr><td class="px-3 py-8 text-center text-muted" colspan="10">{$t('empty')}</td></tr>
           {/each}
         </tbody>
       </table>
@@ -268,7 +318,7 @@
   {/if}
 </section>
 
-<Modal open={showCreate} title={$t('createPart')} onclose={() => (showCreate = false)}>
+<Modal open={showCreate} title={$t('createPart')} onclose={closeCreate}>
   <div class="space-y-3">
     <input class="input-field" placeholder={$t('sku')} bind:value={form.sku} />
     <input class="input-field" placeholder={$t('name')} bind:value={form.name} />
@@ -280,7 +330,7 @@
   </div>
 </Modal>
 
-<Modal open={showEdit} title="Edit part" onclose={() => (showEdit = false)}>
+<Modal open={showEdit} title="Edit part" onclose={closeEdit}>
   <div class="space-y-3">
     <input class="input-field" bind:value={editForm.name} />
     <input class="input-field" bind:value={editForm.category} />
@@ -291,13 +341,13 @@
   </div>
 </Modal>
 
-<Modal open={showStock} title={$t('stockIn')} onclose={() => (showStock = false)}>
+<Modal open={showStock} title={$t('stockIn')} onclose={closeStock}>
   <label class="mb-1 block text-sm" for="sq">{$t('quantity')}</label>
   <input id="sq" type="number" min="1" class="input-field mb-3" bind:value={stockQty} />
   <Button onclick={doStockIn}>{$t('save')}</Button>
 </Modal>
 
-<Modal open={showAdjust} title={$t('adjustStock')} onclose={() => (showAdjust = false)}>
+<Modal open={showAdjust} title={$t('adjustStock')} onclose={closeAdjust}>
   <label class="mb-1 block text-sm" for="ad">Delta (+/−)</label>
   <input id="ad" type="number" class="input-field mb-3" bind:value={adjustDelta} />
   <label class="mb-1 block text-sm" for="ar">{$t('reason')} *</label>

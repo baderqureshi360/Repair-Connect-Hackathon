@@ -58,9 +58,20 @@ function assertConfig(useMemoryDb: boolean): void {
     if (process.env.COOKIE_SAME_SITE === 'none' && process.env.COOKIE_SECURE === 'false') {
       throw new Error('[config] FATAL: COOKIE_SAME_SITE=none requires Secure cookies.');
     }
+    if (process.env.COOKIE_SECURE === 'false') {
+      throw new Error(
+        '[config] FATAL: COOKIE_SECURE=false is not allowed in production (HTTPS required).'
+      );
+    }
     if (!(process.env.CLIENT_URL || '').trim()) {
       throw new Error(
         '[config] FATAL: CLIENT_URL is required in production (CORS + credentialed cookies).'
+      );
+    }
+    const clientUrl = (process.env.CLIENT_URL || '').trim();
+    if (clientUrl && !/^https:\/\//i.test(clientUrl) && !/^http:\/\/localhost\b/i.test(clientUrl)) {
+      throw new Error(
+        '[config] FATAL: CLIENT_URL must use https:// in production (except localhost staging).'
       );
     }
     if ((process.env.PROVISIONING_API_KEY || '').trim().length > 0 &&
@@ -105,9 +116,21 @@ const cookieSameSite =
 export const DEMO_ACCOUNT_EMAILS = [
   'customer@repairconnect.local',
   'mechanic@repairconnect.local',
+  'mechanic.khi@repairconnect.local',
   'parts@repairconnect.local',
-  'admin@repairconnect.local'
+  'admin@repairconnect.local',
+  'lhr@repairconnect.local',
+  'khi@repairconnect.local'
 ] as const;
+
+/** Prefer COOKIE_SECURE=true under HTTPS. Production always forces Secure. */
+function resolveCookieSecure(sameSite: 'none' | 'strict' | 'lax'): boolean {
+  if (process.env.COOKIE_SECURE === 'true') return true;
+  if (process.env.COOKIE_SECURE === 'false') return false;
+  return isProd || sameSite === 'none';
+}
+
+const cookieSecure = resolveCookieSecure(cookieSameSite);
 
 export const env = {
   nodeEnv,
@@ -125,6 +148,7 @@ export const env = {
   /** Demo seed logins are always blocked in production. */
   allowDemoLogin: !isProd && process.env.ALLOW_DEMO_LOGIN !== 'false',
   cookieSameSite,
+  cookieSecure,
   cookieDomain: (process.env.COOKIE_DOMAIN || '').trim() || undefined,
   accessTokenTtlSec: Number(process.env.ACCESS_TOKEN_TTL_SEC || 60 * 60 * 2),
   refreshTokenTtlSec: Number(process.env.REFRESH_TOKEN_TTL_SEC || 60 * 60 * 24 * 7),
@@ -133,6 +157,10 @@ export const env = {
    * Not a platform super-admin role — only unlocks the provisioning API/CLI.
    */
   provisioningApiKey: (process.env.PROVISIONING_API_KEY || '').trim(),
+  /** Optional Sentry DSN — never commit the real value. */
+  sentryDsn: (process.env.SENTRY_DSN || '').trim(),
+  sentryEnvironment: (process.env.SENTRY_ENVIRONMENT || nodeEnv).trim(),
+  sentryTracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE || (isProd ? 0.1 : 0)),
   envFile: loaded.envPath,
   rootDir: loaded.rootDir
 };

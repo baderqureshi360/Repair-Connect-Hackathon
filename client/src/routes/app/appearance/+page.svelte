@@ -12,18 +12,25 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
   import Button from '$lib/components/Button.svelte';
   import Alert from '$lib/components/Alert.svelte';
+  import UnsavedChangesGuard from '$lib/components/UnsavedChangesGuard.svelte';
+  import { requestShortcutsHelp } from '$lib/keyboard/ui';
 
   let form = $state<UserPreferences>({ ...defaultPreferences });
+  let savedJson = $state(JSON.stringify(defaultPreferences));
   let error = $state('');
   let saving = $state(false);
+
+  const dirty = $derived(JSON.stringify(form) !== savedJson);
 
   onMount(async () => {
     try {
       const me = await api<{ preferences?: Partial<UserPreferences> }>('/api/v1/auth/me');
       form = { ...defaultPreferences, ...(me.preferences || {}) };
+      savedJson = JSON.stringify(form);
       applyPreferences(form);
     } catch {
       form = { ...$preferences };
+      savedJson = JSON.stringify(form);
     }
   });
 
@@ -37,6 +44,8 @@
         body: JSON.stringify(form)
       });
       applyPreferences(saved);
+      form = { ...saved };
+      savedJson = JSON.stringify(form);
       toasts.success('Preferences saved');
     } catch (err) {
       error = err instanceof ApiError ? err.message : $t('errorGeneric');
@@ -46,19 +55,41 @@
   }
 
   function restoreDefaults() {
-    form = { ...defaultPreferences };
+    /* Local restore only — does not PATCH until Save. Preserves intentional user saves. */
+    form = { ...defaultPreferences, accent: 'emerald' };
     applyPreferences(form);
   }
 </script>
 
 <section class="mx-auto max-w-2xl space-y-6">
+  <UnsavedChangesGuard dirty={dirty} />
   <PageHeader title="Appearance & preferences" subtitle="Personal settings for this account only" />
 
   {#if error}
     <Alert type="error" role="alert" message={error} />
   {/if}
 
-  <form class="space-y-5 rounded-lg border border-border bg-surface-elevated p-4" onsubmit={save}>
+  <div class="rounded-lg border border-border bg-surface-elevated p-4">
+    <h2 class="text-sm font-semibold">{$t('keyboardShortcuts')}</h2>
+    <p class="mt-1 text-sm text-muted">{$t('keyboardShortcutsHint')}</p>
+    <p class="mt-2 text-xs text-muted">
+      <kbd class="rounded border border-border px-1.5 py-0.5">Ctrl + K</kbd>
+      {$t('commandPalette')}
+      ·
+      <kbd class="rounded border border-border px-1.5 py-0.5">Ctrl + /</kbd>
+      {$t('keyboardShortcuts')}
+    </p>
+    <button type="button" class="btn btn-outline btn-sm mt-3" onclick={() => requestShortcutsHelp()}>
+      {$t('viewAllShortcuts')}
+    </button>
+  </div>
+
+  <form
+    class="space-y-5 rounded-lg border border-border bg-surface-elevated p-4"
+    data-rc-save
+    data-rc-submit
+    onsubmit={save}
+  >
     <div>
       <label class="mb-1 block text-sm font-medium" for="theme">Theme</label>
       <select id="theme" class="input-field w-full" bind:value={form.theme}>
@@ -70,11 +101,21 @@
 
     <fieldset>
       <legend class="mb-2 text-sm font-medium">Accent color</legend>
+      <p class="mb-2 text-xs text-muted">
+        Saved accents are kept until you change them. Restore defaults selects Porto green locally —
+        click Save preferences to persist.
+      </p>
       <div class="flex flex-wrap gap-2">
-        {#each ['indigo', 'blue', 'teal', 'violet', 'emerald'] as accent}
+        {#each [
+          { id: 'emerald', label: 'Porto green' },
+          { id: 'indigo', label: 'Indigo' },
+          { id: 'blue', label: 'Blue' },
+          { id: 'teal', label: 'Teal' },
+          { id: 'violet', label: 'Violet' }
+        ] as accent}
           <label class="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
-            <input type="radio" name="accent" value={accent} bind:group={form.accent} />
-            <span class="capitalize">{accent}</span>
+            <input type="radio" name="accent" value={accent.id} bind:group={form.accent} />
+            <span>{accent.label}</span>
           </label>
         {/each}
       </div>

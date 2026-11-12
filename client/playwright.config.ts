@@ -16,10 +16,15 @@ export default defineConfig({
     {
       command: 'npm run dev -w server',
       url: 'http://localhost:5000/health',
-      // Keep production-style auth rate limits on; E2E specs must reuse sessions.
+      // E2E may reuse an already-running API. When Playwright starts the server,
+      // disable auth rate limits so multi-role suites are not flaky.
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
-      cwd: '..'
+      cwd: '..',
+      env: {
+        ...process.env,
+        DISABLE_AUTH_RATE_LIMIT: '1'
+      }
     },
     {
       command: 'npm run dev -w client',

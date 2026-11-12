@@ -1,13 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { loginAs } from './helpers/auth';
 
-async function login(page: Page, email: string) {
-  await page.goto('/login');
-  await page.getByLabel(/email|ای میل/i).fill(email);
-  await page.getByLabel(/password|پاس ورڈ/i).fill('Password123!');
-  await page.getByRole('button', { name: /sign in|سائن ان/i }).click();
-  await page.waitForURL(/\/app\//, { timeout: 20000 });
-}
+test.describe.configure({ mode: 'serial' });
 
 async function expectNoSeriousAxe(page: Page, label: string) {
   await page.waitForLoadState('domcontentloaded');
@@ -28,8 +23,8 @@ async function switchUrdu(page: Page) {
 }
 
 test.describe('Portal accessibility and RTL', () => {
-  test('customer portal axe + keyboard + RTL', async ({ page }) => {
-    await login(page, 'customer@repairconnect.local');
+  test('customer portal axe + keyboard + RTL', async ({ page, request }) => {
+    await loginAs(page, request, 'customer@repairconnect.local');
     await expect(page).toHaveURL(/customer/);
     await expectNoSeriousAxe(page, 'customer-dashboard');
 
@@ -62,16 +57,16 @@ test.describe('Portal accessibility and RTL', () => {
     await expect(page.locator('main')).toBeVisible({ timeout: 5000 });
   });
 
-  test('mechanic portal axe + RTL', async ({ page }) => {
-    await login(page, 'mechanic@repairconnect.local');
+  test('mechanic portal axe + RTL', async ({ page, request }) => {
+    await loginAs(page, request, 'mechanic@repairconnect.local');
     await expect(page).toHaveURL(/mechanic/);
     await expectNoSeriousAxe(page, 'mechanic-dashboard');
     await switchUrdu(page);
     await expect(page.locator('html')).toHaveAttribute('lang', 'ur');
   });
 
-  test('parts portal axe + tables', async ({ page }) => {
-    await login(page, 'parts@repairconnect.local');
+  test('parts portal axe + tables', async ({ page, request }) => {
+    await loginAs(page, request, 'parts@repairconnect.local');
     await expect(page).toHaveURL(/parts/);
     await expectNoSeriousAxe(page, 'parts-dashboard');
     await page.goto('/app/parts/inventory');
@@ -80,13 +75,75 @@ test.describe('Portal accessibility and RTL', () => {
     await switchUrdu(page);
   });
 
-  test('admin portal axe + staff', async ({ page }) => {
-    await login(page, 'admin@repairconnect.local');
+  test('admin portal axe + staff', async ({ page, request }) => {
+    await loginAs(page, request, 'admin@repairconnect.local');
     await expect(page).toHaveURL(/admin/);
     await expectNoSeriousAxe(page, 'admin-dashboard');
     await page.goto('/app/admin/staff');
     await expect(page.getByRole('heading')).toBeVisible();
     await expectNoSeriousAxe(page, 'admin-staff');
     await switchUrdu(page);
+  });
+
+  test('platform operator axe + applications + RTL', async ({ page, request }) => {
+    try {
+      await loginAs(page, request, 'p4.e2e.ops@repairconnect.local');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      test.skip(
+        /rate-limited|INVALID_CREDENTIALS|Invalid credentials|login failed/i.test(msg),
+        `No platform operator account in this environment: ${msg}`
+      );
+      throw err;
+    }
+    await expect(page).toHaveURL(/\/app\/platform/);
+    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+    await expectNoSeriousAxe(page, 'platform-dashboard');
+
+    await page.goto('/app/platform/shop-applications');
+    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+    await expectNoSeriousAxe(page, 'platform-shop-applications');
+
+    await page.goto('/app/platform/supplier-applications');
+    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+    await expectNoSeriousAxe(page, 'platform-supplier-applications');
+
+    await switchUrdu(page);
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await page.setViewportSize({ width: 360, height: 800 });
+    await expect(page.locator('main')).toBeVisible({ timeout: 5000 });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(page.locator('main')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('supplier portal axe + catalog + RTL', async ({ page, request }) => {
+    try {
+      await loginAs(page, request, 'supplier@repairconnect.local');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      test.skip(
+        /rate-limited|INVALID_CREDENTIALS|Invalid credentials|login failed for supplier/i.test(msg),
+        `No demo supplier account in this environment: ${msg}`
+      );
+      throw err;
+    }
+    await expect(page).toHaveURL(/supplier/);
+    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+    await expectNoSeriousAxe(page, 'supplier-dashboard');
+
+    await page.goto('/app/supplier/catalog');
+    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+    await expectNoSeriousAxe(page, 'supplier-catalog');
+
+    await page.goto('/app/supplier/rfqs');
+    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+    await expectNoSeriousAxe(page, 'supplier-rfqs');
+
+    await switchUrdu(page);
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await page.setViewportSize({ width: 360, height: 800 });
+    await expect(page.locator('main')).toBeVisible({ timeout: 5000 });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(page.locator('main')).toBeVisible({ timeout: 5000 });
   });
 });

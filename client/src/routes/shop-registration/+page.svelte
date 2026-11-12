@@ -118,7 +118,7 @@
 </svelte:head>
 
 <main class="mx-auto min-h-screen max-w-2xl px-4 py-10">
-  <a href="/" class="text-sm text-accent hover:underline">← {$t('home')}</a>
+  <a href="/" class="text-sm text-link hover:underline">← {$t('home')}</a>
   <h1 class="mt-4 text-2xl font-bold">{$t('shopRegistrationTitle')}</h1>
   <p class="mt-2 text-sm text-muted">{$t('shopRegistrationOwnerHint')}</p>
 

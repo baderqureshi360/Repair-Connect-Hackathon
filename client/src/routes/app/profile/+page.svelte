@@ -8,6 +8,7 @@
   import Button from '$lib/components/Button.svelte';
   import Alert from '$lib/components/Alert.svelte';
   import Skeleton from '$lib/components/Skeleton.svelte';
+  import UnsavedChangesGuard from '$lib/components/UnsavedChangesGuard.svelte';
 
   let loading = $state(true);
   let saving = $state(false);
@@ -19,6 +20,15 @@
   let currentPassword = $state('');
   let newPassword = $state('');
   let error = $state('');
+  let savedSnapshot = $state({ name: '', phone: '', preferredLanguage: 'en' as 'en' | 'ur' });
+
+  const profileDirty = $derived(
+    !loading &&
+      (name !== savedSnapshot.name ||
+        phone !== savedSnapshot.phone ||
+        preferredLanguage !== savedSnapshot.preferredLanguage ||
+        Boolean(currentPassword || newPassword))
+  );
 
   onMount(async () => {
     try {
@@ -28,6 +38,7 @@
       role = me.role;
       phone = (me as any).phone || '';
       preferredLanguage = me.preferredLanguage || 'en';
+      savedSnapshot = { name, phone, preferredLanguage };
       setSession(me);
     } finally {
       loading = false;
@@ -44,6 +55,7 @@
         body: JSON.stringify({ name, phone, preferredLanguage })
       });
       setSession({ ...updated, email, role: updated.role });
+      savedSnapshot = { name, phone, preferredLanguage };
       toasts.success($t('saved') || 'Saved');
     } catch (err) {
       error = err instanceof ApiError ? err.message : $t('errorGeneric');
@@ -72,7 +84,8 @@
   }
 </script>
 
-<section class="mx-auto max-w-2xl space-y-8">
+<section class="mx-auto min-w-0 max-w-2xl space-y-5 overflow-x-clip md:space-y-6">
+  <UnsavedChangesGuard dirty={profileDirty} />
   <PageHeader title={$t('profile') || 'Profile'} subtitle={$t('account')} />
 
   {#if loading}
@@ -82,7 +95,8 @@
       <Alert type="error" role="alert" message={error} />
     {/if}
 
-    <form class="space-y-4 rounded-lg border border-border bg-surface-elevated p-4" onsubmit={saveProfile}>
+    <form class="surface-card space-y-4 p-4" data-rc-save data-rc-submit onsubmit={saveProfile}>
+      <h2 class="text-sm font-semibold text-ink">{$t('profile')}</h2>
       <div>
         <label class="mb-1 block text-sm font-medium" for="profile-email">{$t('email')}</label>
         <input id="profile-email" class="input-field w-full" value={email} disabled />
@@ -110,8 +124,8 @@
       <Button type="submit" loading={saving}>Save profile</Button>
     </form>
 
-    <form class="space-y-4 rounded-lg border border-border bg-surface-elevated p-4" onsubmit={changePassword}>
-      <h2 class="text-lg font-semibold">Change password</h2>
+    <form class="surface-card space-y-4 p-4" onsubmit={changePassword}>
+      <h2 class="text-sm font-semibold text-ink">Change password</h2>
       <div>
         <label class="mb-1 block text-sm font-medium" for="current-password">Current password</label>
         <input id="current-password" type="password" class="input-field w-full" bind:value={currentPassword} required autocomplete="current-password" />
@@ -124,7 +138,7 @@
     </form>
 
     <p class="text-sm">
-      <a class="underline" href="/app/appearance">Appearance & preferences</a>
+      <a class="font-medium text-accent underline" href="/app/appearance">Appearance & preferences</a>
     </p>
   {/if}
 </section>

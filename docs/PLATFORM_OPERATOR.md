@@ -1,15 +1,17 @@
 # Platform shop application operators
 
-Platform operators review and approve shop-owner registrations. This authority is **separate** from the four operational roles (`customer`, `mechanic`, `parts_coordinator`, `shop_admin`). Ordinary shop admins never receive these privileges.
+Platform operators review and approve shop-owner and supplier-network registrations. This authority is **separate** from operational roles (`customer`, `mechanic`, `parts_coordinator`, `shop_admin`, `supplier`). Ordinary shop admins and suppliers never receive these privileges.
 
 ## What operators can do
 
 - Sign in at `/login?portal=shop` with a `platform_operator` account.
 - Open **Shop applications** at `/app/platform/shop-applications`.
-- Filter **Pending / Approved / Rejected / All**.
-- Inspect application details.
-- **Approve** — runs the verified provisioning service (one shop + one `shop_admin` membership; owner password preserved; reviewer + audit recorded).
+- Open **Supplier applications** at `/app/platform/supplier-applications`.
+- Filter **Pending / Approved / Rejected / Suspended / All**.
+- Inspect application details and verification documents.
+- **Approve** — shops: one shop + `shop_admin` membership; suppliers: one `SupplierBusiness` profile. Reviewer + audit recorded.
 - **Reject** — requires a reason (min 5 characters).
+- **Suspend / Reactivate** — approved suppliers only; suspended suppliers are hidden from marketplace search.
 
 Applicants cannot approve their own applications. Duplicate approvals are blocked.
 

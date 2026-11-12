@@ -13,6 +13,9 @@ export async function stockIn(input: {
   quantity: number;
   userId: string;
   notes?: string;
+  referenceType?: string;
+  referenceId?: string;
+  session?: mongoose.ClientSession;
 }) {
   if (input.quantity <= 0) {
     throw new AppError('Quantity must be positive', 400, 'INVALID_QUANTITY');
@@ -21,20 +24,27 @@ export async function stockIn(input: {
   const part = await Part.findByIdAndUpdate(
     input.partId,
     { $inc: { quantityAvailable: input.quantity } },
-    { new: true }
+    { new: true, session: input.session }
   );
   if (!part) throw new AppError('Part not found', 404, 'NOT_FOUND');
 
-  await InventoryMovement.create({
-    part: part._id,
-    shop: part.shop,
-    type: 'stock_in',
-    quantity: input.quantity,
-    balanceAfterAvailable: part.quantityAvailable,
-    balanceAfterReserved: part.quantityReserved,
-    performedBy: input.userId,
-    notes: input.notes || 'Stock arrival'
-  });
+  await InventoryMovement.create(
+    [
+      {
+        part: part._id,
+        shop: part.shop,
+        type: 'stock_in',
+        quantity: input.quantity,
+        balanceAfterAvailable: part.quantityAvailable,
+        balanceAfterReserved: part.quantityReserved,
+        performedBy: input.userId,
+        referenceType: input.referenceType,
+        referenceId: input.referenceId,
+        notes: input.notes || 'Stock arrival'
+      }
+    ],
+    { session: input.session }
+  );
 
   await writeAudit({
     actor: input.userId,
@@ -42,7 +52,8 @@ export async function stockIn(input: {
     entityType: 'Part',
     entityId: part._id,
     shop: part.shop,
-    details: { quantity: input.quantity }
+    details: { quantity: input.quantity, referenceType: input.referenceType },
+    session: input.session
   });
 
   return part;

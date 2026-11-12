@@ -7,7 +7,7 @@ const preferencesSchema = new Schema(
     accent: {
       type: String,
       enum: ['indigo', 'blue', 'teal', 'violet', 'emerald'],
-      default: 'indigo'
+      default: 'emerald'
     },
     density: { type: String, enum: ['comfortable', 'compact'], default: 'comfortable' },
     fontScale: { type: String, enum: ['standard', 'large'], default: 'standard' },
@@ -27,10 +27,12 @@ const preferencesSchema = new Schema(
  * Account lifecycle:
  * - Pending shop owners use operational role `shop_admin` with `pending_shop_owner`
  *   until approval creates a ShopMembership — they cannot access shop APIs until then.
+ * - Pending suppliers use role `supplier` with `pending_supplier` until approval
+ *   creates a SupplierBusiness — they cannot access supplier/marketplace APIs until then.
  * - Platform onboarding authority uses role `platform_operator` (not shop-scoped).
  *   Never grant that role via public registration or shop staff APIs.
  */
-export const ACCOUNT_STATUSES = ['active', 'pending_shop_owner'] as const;
+export const ACCOUNT_STATUSES = ['active', 'pending_shop_owner', 'pending_supplier'] as const;
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
 
 const userSchema = new Schema(

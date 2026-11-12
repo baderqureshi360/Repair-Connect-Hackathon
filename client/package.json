@@ -10,6 +10,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
     "test:a11y": "playwright test tests/a11y.spec.ts"
   },
   "engines": {
@@ -33,6 +34,7 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
+    "@sentry/sveltekit": "^11.11.0",
     "@sveltejs/adapter-node": "^5.5.8",
     "chart.js": "^4.6.1"
   }

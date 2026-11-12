@@ -38,7 +38,13 @@ const config = {
               'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com'],
               'font-src': ['self', 'data:', 'https://fonts.gstatic.com'],
               'img-src': ['self', 'data:', 'blob:'],
-              'connect-src': ['self', apiConnect].filter(Boolean),
+              // Allow Sentry ingest when PUBLIC_SENTRY_DSN / monitoring is enabled.
+              'connect-src': [
+                'self',
+                apiConnect,
+                'https://*.ingest.sentry.io',
+                'https://*.ingest.us.sentry.io'
+              ].filter(Boolean),
               'object-src': ['none'],
               'base-uri': ['self'],
               'frame-ancestors': ['none'],

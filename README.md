@@ -67,6 +67,7 @@ Never commit real credentials. `.env` is gitignored.
 
 ```bash
 npm run test -w server
+npm run test:e2e:install -w client   # once per machine / after Playwright upgrades
 npm run test:e2e -w client
 ```
 

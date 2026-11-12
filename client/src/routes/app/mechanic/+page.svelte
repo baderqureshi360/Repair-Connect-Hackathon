@@ -33,7 +33,7 @@
     try {
       const [a, res] = await Promise.all([
         api<any>(`/api/v1/analytics/me?${query()}`),
-        api<{ data: any[] }>('/api/v1/repairs?limit=20', { full: true })
+        api<{ data: any[] }>('/api/v1/repairs?limit=50', { full: true })
       ]);
       analytics = a;
       jobs = res.data || [];
@@ -46,55 +46,127 @@
 
   onMount(load);
 
+  const newAssignments = $derived(jobs.filter((j) => j.status === 'assigned'));
+  const awaitingDiagnosis = $derived(jobs.filter((j) => ['assigned', 'diagnosing'].includes(j.status)));
+  const estimatesAwaiting = $derived(jobs.filter((j) => j.status === 'estimate_pending'));
+  const awaitingParts = $derived(
+    jobs.filter((j) => ['awaiting_parts', 'parts_reserved'].includes(j.status))
+  );
   const inProgress = $derived(jobs.filter((j) => j.status === 'in_progress'));
-  const awaitingParts = $derived(jobs.filter((j) => j.status === 'awaiting_parts'));
+  const readyForCollection = $derived(jobs.filter((j) => j.status === 'ready_for_collection'));
   const overdue = $derived(
     jobs.filter(
       (j) => j.deadline && new Date(j.deadline) < new Date() && !['completed', 'cancelled'].includes(j.status)
     )
   );
-  const actionable = $derived(
-    jobs.filter((j) =>
-      ['assigned', 'diagnosing', 'estimate_approved', 'parts_reserved', 'in_progress'].includes(j.status)
-    )
+  const priorityJobs = $derived(
+    [
+      ...overdue.map((j) => ({ job: j, reason: 'overdue' as const })),
+      ...newAssignments.map((j) => ({ job: j, reason: 'new' as const })),
+      ...awaitingDiagnosis
+        .filter((j) => j.status === 'diagnosing')
+        .map((j) => ({ job: j, reason: 'diagnosis' as const })),
+      ...estimatesAwaiting.map((j) => ({ job: j, reason: 'estimate' as const })),
+      ...awaitingParts.map((j) => ({ job: j, reason: 'parts' as const })),
+      ...inProgress.map((j) => ({ job: j, reason: 'active' as const })),
+      ...readyForCollection.map((j) => ({ job: j, reason: 'collection' as const }))
+    ]
+      .filter((item, idx, arr) => arr.findIndex((x) => x.job._id === item.job._id) === idx)
+      .slice(0, 8)
   );
+
+  function priorityLabel(reason: string) {
+    switch (reason) {
+      case 'overdue':
+        return $t('overdue');
+      case 'new':
+        return $t('newAssignments');
+      case 'diagnosis':
+        return $t('awaitingDiagnosis');
+      case 'estimate':
+        return $t('estimatesAwaitingApproval');
+      case 'parts':
+        return $t('awaitingParts');
+      case 'active':
+        return $t('inProgress');
+      case 'collection':
+        return $t('readyForCollection');
+      default:
+        return $t('pendingActions');
+    }
+  }
+
   const firstName = $derived($user?.name?.split(' ')[0] || $t('mechanic'));
+  const assignedTotal = $derived(analytics?.summary?.assigned ?? jobs.length);
 </script>
 
-<section class="space-y-6">
-  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight md:text-3xl">
-        {$t('welcomeBack')}, {firstName}!
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
+  <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+    <div class="min-w-0">
+      <p class="text-xs font-semibold uppercase tracking-wide text-muted">{$t('dashboard')}</p>
+      <h1 class="mt-1 text-xl font-semibold tracking-tight text-ink md:text-2xl">
+        {$t('welcomeBack')}, {firstName}
       </h1>
-      <p class="mt-1 text-sm text-muted">{$t('mechanicWelcomeSubtitle')}</p>
+      <p class="mt-1 max-w-2xl text-sm text-muted">{$t('mechanicWelcomeSubtitle')}</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <DateRangeFilter bind:value={range} bind:from bind:to onchange={load} />
       <Button href="/app/mechanic/jobs" variant="secondary" size="sm">{$t('viewJobs')}</Button>
     </div>
-  </div>
+  </header>
 
   {#if loading && !analytics}
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-busy="true">
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="status" aria-busy="true" aria-label={$t('loading')}>
       {#each Array.from({ length: 4 }) as _}<Skeleton class="h-28" />{/each}
     </div>
+    <div class="grid gap-4 lg:grid-cols-3" aria-hidden="true">
+      <Skeleton class="h-72 lg:col-span-2" />
+      <Skeleton class="h-72" />
+    </div>
   {:else if error}
-    <Alert type="error" role="alert" message={error} />
+    <div class="space-y-3">
+      <Alert type="error" role="alert" message={error} />
+      <Button variant="outline" loading={loading} onclick={load}>{$t('retry')}</Button>
+    </div>
   {:else if analytics}
     <StatGrid
       stats={[
         {
           label: $t('assignedJobs'),
-          value: analytics.summary?.assigned ?? jobs.length,
+          value: assignedTotal,
           icon: 'wrench',
-          tone: 'indigo'
+          tone: 'primary',
+          hint: $t('newAssignments') + `: ${newAssignments.length}`
+        },
+        {
+          label: $t('awaitingDiagnosis'),
+          value: awaitingDiagnosis.length,
+          icon: 'clipboard',
+          tone: 'amber'
+        },
+        {
+          label: $t('estimatesAwaitingApproval'),
+          value: estimatesAwaiting.length,
+          icon: 'fileText',
+          tone: 'violet'
+        },
+        {
+          label: $t('awaitingParts'),
+          value: analytics.summary?.awaitingParts ?? awaitingParts.length,
+          icon: 'package',
+          tone: 'blue'
         },
         {
           label: $t('inProgress'),
           value: analytics.summary?.inProgress ?? inProgress.length,
           icon: 'clock',
           tone: 'amber'
+        },
+        {
+          label: $t('readyForCollection'),
+          value: readyForCollection.length,
+          icon: 'checkCircle',
+          tone: 'green'
         },
         {
           label: $t('completedRepairs'),
@@ -113,73 +185,67 @@
 
     <DashboardAnalytics hideRange providedData={analytics} />
 
-    <div class="grid gap-4 lg:grid-cols-3">
-      <div class="surface-card p-4 lg:col-span-2">
-        <h2 class="mb-3 text-base font-semibold">{$t('assignedJobs')}</h2>
-        <ul class="space-y-2">
-          {#each jobs as job}
-            <li class="surface-card surface-card-interactive p-3">
-              <div class="flex justify-between gap-2">
-                <a class="font-medium text-accent hover:underline" href={`/app/repairs/${job._id}`}>
+    <div class="grid gap-4 xl:grid-cols-3">
+      <section class="surface-card flex flex-col p-4 xl:col-span-2" aria-labelledby="mechanic-jobs-heading">
+        <div class="mb-3 flex items-center justify-between gap-2">
+          <h2 id="mechanic-jobs-heading" class="text-sm font-semibold text-ink">{$t('assignedJobs')}</h2>
+          <a class="text-xs font-medium hover:underline" href="/app/mechanic/jobs">{$t('viewAll')}</a>
+        </div>
+        <ul class="space-y-2" role="list">
+          {#each jobs.slice(0, 8) as job}
+            <li class="rounded-[var(--radius-ui)] border border-border px-3 py-2.5">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <a class="font-medium hover:underline" href={`/app/repairs/${job._id}`}>
                   {job.referenceNumber}
                 </a>
                 <StatusPill status={job.status} />
               </div>
-              <p class="text-sm text-muted">
-                {job.brand} {job.model} — {job.customer?.name || ''}
+              <p class="mt-1 text-sm text-muted">
+                {job.brand} {job.model}
+                {#if job.customer?.name}
+                  — {job.customer.name}
+                {/if}
                 {#if job.deadline}
                   · {$t('deadline')} {new Date(job.deadline).toLocaleDateString()}
                 {/if}
               </p>
             </li>
           {:else}
-            <li class="text-muted">{$t('empty')}</li>
+            <li class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-6 text-center text-sm text-muted" role="status">
+              {$t('empty')}
+            </li>
           {/each}
         </ul>
-      </div>
+      </section>
 
-      <div class="space-y-4">
-        <div class="priorities-panel rounded-xl p-4">
-          <h2 class="mb-3 text-base font-semibold text-white">{$t('todaysPriorities')}</h2>
-          <ul class="space-y-2 text-sm text-indigo-50">
-            {#each overdue.slice(0, 4) as job}
-              <li>
-                <a class="hover:text-white" href={`/app/repairs/${job._id}`}>
-                  {$t('overdue')}: {job.referenceNumber}
-                </a>
-              </li>
-            {/each}
-            {#each awaitingParts.slice(0, 3) as job}
-              <li>
-                <a class="hover:text-white" href={`/app/repairs/${job._id}`}>
-                  {$t('awaitingParts')}: {job.referenceNumber}
-                </a>
-              </li>
-            {/each}
-            {#if !overdue.length && !awaitingParts.length}
-              <li class="text-indigo-100/70">{$t('empty')}</li>
-            {/if}
-          </ul>
-        </div>
-
-        <div class="surface-card p-4">
-          <h2 class="mb-3 text-base font-semibold">{$t('pendingActions')}</h2>
-          {#if actionable.length}
-            <ul class="space-y-2 text-sm">
-              {#each actionable.slice(0, 5) as job}
-                <li class="flex items-center gap-2">
-                  <Icon name="wrench" size={14} class="text-accent" />
-                  <a class="text-accent hover:underline" href={`/app/repairs/${job._id}`}>
-                    {job.referenceNumber} · {job.status.replaceAll('_', ' ')}
-                  </a>
-                </li>
-              {/each}
-            </ul>
+      <section class="priorities-panel flex flex-col rounded-[var(--radius-ui)] p-4" aria-labelledby="mechanic-priorities">
+        <h2 id="mechanic-priorities" class="priorities-title mb-1 text-sm font-semibold">{$t('todaysPriorities')}</h2>
+        <p class="priorities-hint mb-3 text-xs">{$t('mechanicWorkflowHint')}</p>
+        <ul class="flex-1 space-y-2 text-sm" role="list">
+          {#each priorityJobs as item}
+            <li>
+              <a
+                class="flex items-start gap-2 text-ink hover:text-[color:var(--color-primary-hover)]"
+                href={`/app/repairs/${item.job._id}`}
+              >
+                <Icon
+                  name={item.reason === 'overdue' ? 'alertTriangle' : 'wrench'}
+                  size={15}
+                  class={`mt-0.5 shrink-0 ${item.reason === 'overdue' ? 'text-danger' : 'text-accent'}`}
+                />
+                <span>
+                  <span class="font-medium">{priorityLabel(item.reason)}: {item.job.referenceNumber}</span>
+                  <span class="block text-xs text-muted">{item.job.brand} {item.job.model}</span>
+                </span>
+              </a>
+            </li>
           {:else}
-            <p class="text-sm text-muted">{$t('empty')}</p>
-          {/if}
-        </div>
-      </div>
+            <li class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-6 text-center text-muted" role="status">
+              {$t('empty')}
+            </li>
+          {/each}
+        </ul>
+      </section>
     </div>
   {/if}
 </section>

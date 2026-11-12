@@ -6,7 +6,7 @@
     value: string | number;
     hint?: string;
     icon?: string;
-    tone?: 'indigo' | 'green' | 'amber' | 'violet' | 'blue' | 'red';
+    tone?: 'indigo' | 'primary' | 'green' | 'amber' | 'violet' | 'blue' | 'red';
     trend?: number | null;
     sparkline?: number[];
   };
@@ -14,7 +14,8 @@
   let { stats = [] }: { stats: KpiStat[] } = $props();
 
   const toneClass: Record<string, string> = {
-    indigo: 'kpi-icon kpi-icon-indigo',
+    indigo: 'kpi-icon kpi-icon-primary',
+    primary: 'kpi-icon kpi-icon-primary',
     green: 'kpi-icon kpi-icon-green',
     amber: 'kpi-icon kpi-icon-amber',
     violet: 'kpi-icon kpi-icon-violet',
@@ -98,8 +99,8 @@
                   ? 'text-success'
                   : stat.tone === 'amber'
                     ? 'text-warning'
-                    : stat.tone === 'violet'
-                      ? 'text-violet-500'
+                    : stat.tone === 'red'
+                      ? 'text-danger'
                       : 'text-accent'
               }
               points={sparkPoints(stat.sparkline)}

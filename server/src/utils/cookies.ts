@@ -10,7 +10,8 @@ export function cookieBaseOptions(): CookieOptions {
   const sameSite = env.cookieSameSite;
   return {
     httpOnly: true,
-    secure: env.isProd || sameSite === 'none',
+    // Production / COOKIE_SECURE=true / SameSite=None → Secure (see env.cookieSecure).
+    secure: env.cookieSecure,
     sameSite,
     path: '/',
     // When API and client are on different sites, browsers require Secure + SameSite=None.

@@ -13,16 +13,43 @@ export const registerSchema = z.object({
 
 const staffRoles = ['mechanic', 'parts_coordinator', 'shop_admin'] as const;
 
-/** Admin-only staff provisioning */
-export const createStaffSchema = z.object({
-  email: z.string().email(),
-  password: strongPasswordSchema,
-  name: z.string().min(2).max(120),
-  role: z.enum(staffRoles),
-  shopId: z.string().min(1),
-  phone: z.string().optional(),
-  preferredLanguage: z.enum(['en', 'ur']).optional()
-});
+/** Admin-only staff provisioning — never allows platform_operator or customer. */
+export const createStaffSchema = z
+  .object({
+    email: z.string().email(),
+    password: strongPasswordSchema,
+    name: z.string().min(2).max(120),
+    role: z.enum(staffRoles),
+    shopId: z.string().min(1),
+    phone: z.string().optional(),
+    preferredLanguage: z.enum(['en', 'ur']).optional(),
+    invite: z.boolean().optional()
+  })
+  .strict();
+
+export const updateStaffSchema = z
+  .object({
+    name: z.string().min(2).max(120).optional(),
+    phone: z.string().max(40).optional(),
+    role: z.enum(staffRoles).optional(),
+    shopId: z.string().min(1).optional(),
+    preferredLanguage: z.enum(['en', 'ur']).optional()
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, { message: 'At least one field is required' });
+
+export const staffPasswordResetSchema = z
+  .object({
+    temporaryPassword: strongPasswordSchema.optional(),
+    invite: z.boolean().optional()
+  })
+  .strict();
+
+export const staffActiveSchema = z
+  .object({
+    isActive: z.boolean()
+  })
+  .strict();
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -281,6 +308,11 @@ export const shopCreateSchema = z.object({
 
 export const forgotPasswordSchema = z.object({
   email: z.string().email()
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(32).max(128),
+  newPassword: z.string().min(8).max(128)
 });
 
 export const repairMessageSchema = z.object({

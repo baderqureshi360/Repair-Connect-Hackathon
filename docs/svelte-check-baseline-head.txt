@@ -1,0 +1,87 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm 
+help npmrc` for supported config options.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+> client@1.0.0 check
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+The following Vite config options will be overridden by SvelteKit:
+  - root
+Loading svelte-check in workspace: c:\Users\bader\Desktop\Hackathon-baseline-check\client
+Getting Svelte diagnostics...
+
+c:\Users\bader\Desktop\Hackathon-baseline-check\client\src\routes\app\customer\shops\+page.svelte:107:68
+Error: Argument of type '"city"' is not assignable to parameter of type '"customer" | "mechanic" | "parts_coordinator" | "shop_admin" | "platform_operator" | "light" | "dark" | "cancel" | "submit" | "offline" | "online" | "results" | "left" | "and" | ... 360 more ... | "reversalEntry"'. (ts)
+    <div>
+      <label class="mb-1 block text-sm font-medium" for="city">{$t('city')}</label>
+      <select id="city" class="input-field" bind:value={city}>
+
+c:\Users\bader\Desktop\Hackathon-baseline-check\client\src\routes\app\platform\shop-applications\+page.svelte:104:51
+Error: Argument of type '"city"' is not assignable to parameter of type '"customer" | "mechanic" | "parts_coordinator" | "shop_admin" | "platform_operator" | "light" | "dark" | "cancel" | "submit" | "offline" | "online" | "results" | "left" | "and" | ... 360 more ... | "reversalEntry"'. (ts)
+            <th class="px-3 py-2 font-medium">{$t('shopName')}</th>
+            <th class="px-3 py-2 font-medium">{$t('city')}</th>
+            <th class="px-3 py-2 font-medium">{$t('serviceCategories')}</th>
+
+c:\Users\bader\Desktop\Hackathon-baseline-check\client\src\routes\app\platform\shop-applications\[id]\+page.svelte:161:68
+Error: Argument of type '"city"' is not assignable to parameter of type '"customer" | "mechanic" | "parts_coordinator" | "shop_admin" | "platform_operator" | "light" | "dark" | "cancel" | "submit" | "offline" | "online" | "results" | "left" | "and" | ... 360 more ... | "reversalEntry"'. (ts)
+      <div>
+        <dt class="text-xs uppercase tracking-wide text-muted">{$t('city')}</dt>
+        <dd class="font-medium">{detail.city}, {detail.region}</dd>
+
+c:\Users\bader\Desktop\Hackathon-baseline-check\client\src\routes\app\platform\shop-applications\[id]\+page.svelte:165:68
+Error: Argument of type '"address"' is not assignable to parameter of type '"customer" | "mechanic" | "parts_coordinator" | "shop_admin" | "platform_operator" | "light" | "dark" | "cancel" | "submit" | "offline" | "online" | "results" | "left" | "and" | ... 360 more ... | "reversalEntry"'. (ts)
+      <div class="sm:col-span-2">
+        <dt class="text-xs uppercase tracking-wide text-muted">{$t('address')}</dt>
+        <dd class="font-medium">{detail.address}</dd>
+
+c:\Users\bader\Desktop\Hackathon-baseline-check\client\src\routes\app\repairs\[id]\+page.svelte:61:5
+Error: Type 'unknown' is not assignable to type 'any[]'. (ts)
+    detail = await api(`/api/v1/repairs/${$page.params.id}`);
+    messages = await api(`/api/v1/repairs/${$page.params.id}/messages`).catch(() => []);
+    if ($user?.role === 'shop_admin') {
+
+c:\Users\bader\Desktop\Hackathon-baseline-check\client\src\routes\app\repairs\[id]\+page.svelte:276:7
+Error: This expression is not callable.
+  Type 'Writable<string>' has no call signatures. (ts)
+      reverseTarget = null;
+      announce($t('reversalSuccess'));
+      toasts.success($t('reversalSuccess'));
+
+c:\Users\bader\Desktop\Hackathon-baseline-check\client\src\routes\app\shop-application\status\+page.svelte:62:38
+Error: Argument of type '"city"' is not assignable to parameter of type '"customer" | "mechanic" | "parts_coordinator" | "shop_admin" | "platform_operator" | "light" | "dark" | "cancel" | "submit" | "offline" | "online" | "results" | "left" | "and" | ... 360 more ... | "reversalEntry"'. (ts)
+        <div>
+          <dt class="text-muted">{$t('city')}</dt>
+          <dd>{app.city}{app.region ? `, ${app.region}` : ''}</dd>
+
+c:\Users\bader\Desktop\Hackathon-baseline-check\client\src\routes\shop-registration\+page.svelte:197:75
+Error: Argument of type '"address"' is not assignable to parameter of type '"customer" | "mechanic" | "parts_coordinator" | "shop_admin" | "platform_operator" | "light" | "dark" | "cancel" | "submit" | "offline" | "online" | "results" | "left" | "and" | ... 360 more ... | "reversalEntry"'. (ts)
+        <div>
+          <label class="mb-1 block text-sm font-medium" for="address">{$t('address')} <span class="text-danger">*</span></label>
+          <input id="address" required class="input-field w-full" bind:value={address} aria-invalid={!!fieldErrors.address} />
+
+c:\Users\bader\Desktop\Hackathon-baseline-check\client\src\routes\shop-registration\+page.svelte:203:74
+Error: Argument of type '"city"' is not assignable to parameter of type '"customer" | "mechanic" | "parts_coordinator" | "shop_admin" | "platform_operator" | "light" | "dark" | "cancel" | "submit" | "offline" | "online" | "results" | "left" | "and" | ... 360 more ... | "reversalEntry"'. (ts)
+          <div>
+            <label class="mb-1 block text-sm font-medium" for="city">{$t('city')} <span class="text-danger">*</span></label>
+            <input id="city" required class="input-field w-full" bind:value={city} aria-invalid={!!fieldErrors.city} />
+
+c:\Users\bader\Desktop\Hackathon-baseline-check\client\src\routes\shop-registration\+page.svelte:208:76
+Error: Argument of type '"region"' is not assignable to parameter of type '"customer" | "mechanic" | "parts_coordinator" | "shop_admin" | "platform_operator" | "light" | "dark" | "cancel" | "submit" | "offline" | "online" | "results" | "left" | "and" | ... 360 more ... | "reversalEntry"'. (ts)
+          <div>
+            <label class="mb-1 block text-sm font-medium" for="region">{$t('region')} <span class="text-danger">*</span></label>
+            <input id="region" required class="input-field w-full" bind:value={region} aria-invalid={!!fieldErrors.region} />
+
+====================================
+svelte-check found 10 errors and 0 warnings in 6 files
+npm error Lifecycle script `check` failed with error:
+npm error code 1
+npm error path C:\Users\bader\Desktop\Hackathon-baseline-check\client
+npm error workspace client@1.0.0
+npm error location C:\Users\bader\Desktop\Hackathon-baseline-check\client
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c svelte-kit sync && svelte-check --tsconfig ./tsconfig.json

@@ -24,7 +24,8 @@
     mechanic: '/app/mechanic',
     parts_coordinator: '/app/parts',
     shop_admin: '/app/admin',
-    platform_operator: '/app/platform/shop-applications'
+    supplier: '/app/supplier',
+    platform_operator: '/app/platform'
   };
 
   function isShopRole(role: Role) {
@@ -32,6 +33,7 @@
       role === 'mechanic' ||
       role === 'parts_coordinator' ||
       role === 'shop_admin' ||
+      role === 'supplier' ||
       role === 'platform_operator'
     );
   }
@@ -50,7 +52,7 @@
           name: string;
           role: Role;
           preferredLanguage?: 'en' | 'ur';
-          accountStatus?: 'active' | 'pending_shop_owner';
+          accountStatus?: 'active' | 'pending_shop_owner' | 'pending_supplier';
           onboardingPending?: boolean;
         };
       }>('/api/v1/auth/login', {
@@ -60,9 +62,17 @@
       setSession(data.user, data.csrfToken);
       if (data.user.preferredLanguage) lang.set(data.user.preferredLanguage);
 
-      // Pending shop owners never enter customer or operational shop portals.
-      if (data.user.onboardingPending || data.user.accountStatus === 'pending_shop_owner') {
-        goto('/app/shop-application/status');
+      // Pending shop owners / suppliers never enter operational portals.
+      if (
+        data.user.onboardingPending ||
+        data.user.accountStatus === 'pending_shop_owner' ||
+        data.user.accountStatus === 'pending_supplier'
+      ) {
+        goto(
+          data.user.accountStatus === 'pending_supplier' || data.user.role === 'supplier'
+            ? '/app/supplier-application/status'
+            : '/app/shop-application/status'
+        );
         return;
       }
 
@@ -103,37 +113,43 @@
 </svelte:head>
 
 <main class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
-  <a href="/" class="mb-4 text-sm text-accent hover:underline">← {$t('home')}</a>
-  <h1 class="text-2xl font-bold">{portal === 'shop' ? $t('loginShopTitle') : $t('loginCustomerTitle')}</h1>
+  <a href="/" class="mb-4 text-sm font-medium hover:underline">← {$t('home')}</a>
+  <h1 class="text-2xl font-bold text-ink">{portal === 'shop' ? $t('loginShopTitle') : $t('loginCustomerTitle')}</h1>
   <p class="mt-1 text-sm text-muted">
     {portal === 'shop' ? $t('loginShopHint') : $t('loginCustomerHint')}
   </p>
   {#if portal === 'shop'}
     <p class="mt-2 text-sm">
-      <a class="font-medium text-accent hover:underline" href="/shop-registration">{$t('registerYourShop')}</a>
+      <a class="font-medium hover:underline" href="/shop-registration">{$t('registerYourShop')}</a>
     </p>
   {/if}
 
-  <div class="mt-4 flex gap-2 text-sm" role="tablist" aria-label="Portal">
+  <div class="mt-4 flex gap-2 text-sm" role="group" aria-label="Portal">
     <a
-      class={`rounded-md px-3 py-1.5 ${portal === 'customer' ? 'bg-accent text-white' : 'border border-border'}`}
+      class={`rounded-[var(--radius-ui)] px-3 py-1.5 ${
+        portal === 'customer'
+          ? 'bg-[color:var(--color-primary)] text-[color:var(--color-accent-foreground)]'
+          : 'border border-border text-ink'
+      }`}
       href="/login?portal=customer"
-      role="tab"
-      aria-selected={portal === 'customer'}
+      aria-current={portal === 'customer' ? 'page' : undefined}
     >
       {$t('forCustomers')}
     </a>
     <a
-      class={`rounded-md px-3 py-1.5 ${portal === 'shop' ? 'bg-accent text-white' : 'border border-border'}`}
+      class={`rounded-[var(--radius-ui)] px-3 py-1.5 ${
+        portal === 'shop'
+          ? 'bg-[color:var(--color-primary)] text-[color:var(--color-accent-foreground)]'
+          : 'border border-border text-ink'
+      }`}
       href="/login?portal=shop"
-      role="tab"
-      aria-selected={portal === 'shop'}
+      aria-current={portal === 'shop' ? 'page' : undefined}
     >
       {$t('forRepairShops')}
     </a>
   </div>
 
-  <form class="mt-6 space-y-4" onsubmit={onSubmit} novalidate>
+  <form class="mt-6 space-y-4" method="post" action="#" onsubmit={onSubmit} novalidate>
     {#if error}
       <Alert type="error" role="alert" message={error} />
     {/if}
@@ -148,7 +164,7 @@
         type="email"
         required
         autocomplete="username"
-        class="w-full rounded-md border border-border bg-surface-elevated px-3 py-2"
+        class="input-field w-full"
         bind:value={email}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={error ? 'login-error' : undefined}
@@ -162,7 +178,7 @@
         type="password"
         required
         autocomplete="current-password"
-        class="w-full rounded-md border border-border bg-surface-elevated px-3 py-2"
+        class="input-field w-full"
         bind:value={password}
         aria-invalid={error ? 'true' : undefined}
       />
@@ -170,12 +186,7 @@
     {#if error}
       <div id="login-error" class="sr-only" role="alert">{error}</div>
     {/if}
-    <button
-      type="submit"
-      class="w-full rounded-md bg-accent px-4 py-2 font-medium text-white disabled:opacity-60"
-      disabled={loading}
-      aria-busy={loading}
-    >
+    <button type="submit" class="btn btn-primary w-full" disabled={loading} aria-busy={loading}>
       {loading ? $t('loading') : $t('login')}
     </button>
   </form>

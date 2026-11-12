@@ -5,6 +5,10 @@
   import { api, ApiError } from '$lib/api';
   import { t } from '$lib/i18n';
   import Alert from '$lib/components/Alert.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
+  import StatusPill from '$lib/components/StatusPill.svelte';
 
   type Detail = {
     id: string;
@@ -26,6 +30,7 @@
     rejectionReason?: string;
     reviewRemarks?: string;
     reviewedAt?: string | null;
+    reviewedBy?: string | null;
     approvedAt?: string | null;
   };
 
@@ -68,6 +73,7 @@
   async function approve() {
     if (!detail || busy) return;
     if (!confirm($t('confirmApprove'))) return;
+    if (!confirm($t('confirmSensitiveAction'))) return;
     busy = true;
     actionError = '';
     actionOk = '';
@@ -91,6 +97,7 @@
       actionError = 'Rejection reason must be at least 5 characters.';
       return;
     }
+    if (!confirm($t('confirmSensitiveAction'))) return;
     busy = true;
     actionError = '';
     actionOk = '';
@@ -110,109 +117,102 @@
   }
 
   const isPending = $derived(
-    detail
-      ? ['pending', 'pending_review', 'contacted'].includes(detail.status)
-      : false
+    detail ? ['pending', 'pending_review', 'contacted'].includes(detail.status) : false
   );
 </script>
 
-<section class="space-y-6">
-  <div>
-    <button type="button" class="text-sm text-accent underline" onclick={() => goto('/app/platform/shop-applications')}>
-      ← {$t('backToApplications')}
-    </button>
-    <h1 class="mt-2 text-2xl font-semibold">{$t('applicationDetail')}</h1>
-  </div>
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
+  <Button variant="outline" size="sm" onclick={() => goto('/app/platform/shop-applications')}>
+    ← {$t('backToApplications')}
+  </Button>
 
   {#if error}
     <Alert type="error" role="alert" message={error} />
   {:else if loading}
-    <p class="text-muted">{$t('loading')}</p>
+    <div class="space-y-3" role="status" aria-busy="true" aria-label={$t('loading')}>
+      {#each Array.from({ length: 4 }) as _}<Skeleton class="h-16" />{/each}
+    </div>
   {:else if detail}
-    {#if actionError}
-      <Alert type="error" role="alert" message={actionError} />
-    {/if}
-    {#if actionOk}
-      <Alert type="success" role="status" message={actionOk} />
-    {/if}
+    <PageHeader title={detail.shopName} subtitle={`${$t('applicationDetail')} · ${detail.id}`}>
+      <StatusPill status={detail.status} />
+    </PageHeader>
 
-    <dl class="grid gap-3 rounded-lg border border-border bg-surface-elevated p-4 sm:grid-cols-2">
-      <div>
-        <dt class="text-xs uppercase tracking-wide text-muted">{$t('applicationReference')}</dt>
-        <dd class="font-medium">{detail.id}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase tracking-wide text-muted">{$t('status')}</dt>
-        <dd class="font-medium capitalize">{detail.status.replaceAll('_', ' ')}</dd>
-      </div>
+    {#if actionError}<Alert type="error" role="alert" message={actionError} />{/if}
+    {#if actionOk}<Alert type="success" role="status" message={actionOk} />{/if}
+
+    <dl class="surface-card grid gap-3 p-4 sm:grid-cols-2">
       <div>
         <dt class="text-xs uppercase tracking-wide text-muted">{$t('ownerName')}</dt>
-        <dd class="font-medium">{detail.ownerName}</dd>
+        <dd class="font-medium text-ink">{detail.ownerName}</dd>
       </div>
       <div>
         <dt class="text-xs uppercase tracking-wide text-muted">{$t('businessEmail')}</dt>
-        <dd class="font-medium">{detail.businessEmail}</dd>
+        <dd class="font-medium text-ink">{detail.businessEmail}</dd>
       </div>
       <div>
-        <dt class="text-xs uppercase tracking-wide text-muted">{$t('shopName')}</dt>
-        <dd class="font-medium">{detail.shopName}</dd>
+        <dt class="text-xs uppercase tracking-wide text-muted">{$t('phone')}</dt>
+        <dd class="font-medium text-ink">{detail.businessPhone || detail.ownerPhone || '—'}</dd>
       </div>
       <div>
         <dt class="text-xs uppercase tracking-wide text-muted">{$t('city')}</dt>
-        <dd class="font-medium">{detail.city}, {detail.region}</dd>
+        <dd class="font-medium text-ink">{detail.city}, {detail.region}</dd>
       </div>
       <div class="sm:col-span-2">
         <dt class="text-xs uppercase tracking-wide text-muted">{$t('address')}</dt>
-        <dd class="font-medium">{detail.address}</dd>
+        <dd class="font-medium text-ink">{detail.address}</dd>
       </div>
       <div class="sm:col-span-2">
         <dt class="text-xs uppercase tracking-wide text-muted">{$t('serviceCategories')}</dt>
-        <dd class="font-medium">{(detail.serviceCategories || []).join(', ') || '—'}</dd>
+        <dd class="font-medium text-ink">{(detail.serviceCategories || []).join(', ') || '—'}</dd>
       </div>
       <div class="sm:col-span-2">
         <dt class="text-xs uppercase tracking-wide text-muted">{$t('servicesDescription')}</dt>
-        <dd class="font-medium whitespace-pre-wrap">{detail.servicesDescription}</dd>
+        <dd class="whitespace-pre-wrap font-medium text-ink">{detail.servicesDescription}</dd>
       </div>
       <div>
         <dt class="text-xs uppercase tracking-wide text-muted">{$t('submissionDate')}</dt>
-        <dd class="font-medium">{formatDate(detail.submittedAt)}</dd>
+        <dd class="font-medium text-ink">{formatDate(detail.submittedAt)}</dd>
       </div>
+      <div>
+        <dt class="text-xs uppercase tracking-wide text-muted">{$t('reviewerIdentity')}</dt>
+        <dd class="font-medium text-ink">{detail.reviewedBy || '—'}</dd>
+      </div>
+      <div>
+        <dt class="text-xs uppercase tracking-wide text-muted">{$t('reviewHistory')}</dt>
+        <dd class="font-medium text-ink">{formatDate(detail.reviewedAt || detail.approvedAt)}</dd>
+      </div>
+      {#if detail.reviewRemarks}
+        <div class="sm:col-span-2">
+          <dt class="text-xs uppercase tracking-wide text-muted">{$t('approvalRemarks')}</dt>
+          <dd class="font-medium text-ink">{detail.reviewRemarks}</dd>
+        </div>
+      {/if}
       {#if detail.rejectionReason}
         <div class="sm:col-span-2">
           <dt class="text-xs uppercase tracking-wide text-muted">{$t('rejectionReasonLabel')}</dt>
-          <dd class="font-medium">{detail.rejectionReason}</dd>
+          <dd class="font-medium text-ink">{detail.rejectionReason}</dd>
         </div>
       {/if}
     </dl>
 
     {#if isPending}
-      <div class="space-y-4 rounded-lg border border-border p-4">
+      <div class="surface-card space-y-4 p-4">
         <label class="block text-sm">
           <span class="mb-1 block text-muted">{$t('approvalRemarks')}</span>
-          <textarea class="input min-h-20 w-full" bind:value={remarks} maxlength="2000"></textarea>
+          <textarea class="input-field min-h-20 w-full" bind:value={remarks} maxlength="2000"></textarea>
         </label>
         <div class="flex flex-wrap gap-2">
-          <button type="button" class="btn btn-primary" disabled={busy} onclick={approve}>
-            {$t('approveApplication')}
-          </button>
-          <button
-            type="button"
-            class="btn btn-danger"
-            disabled={busy}
-            onclick={() => (showReject = !showReject)}
-          >
+          <Button variant="primary" disabled={busy} onclick={approve}>{$t('approveApplication')}</Button>
+          <Button variant="danger" disabled={busy} onclick={() => (showReject = !showReject)}>
             {$t('rejectApplication')}
-          </button>
+          </Button>
         </div>
-
         {#if showReject}
           <label class="block text-sm">
             <span class="mb-1 block text-muted">{$t('rejectionReasonLabel')} *</span>
-            <textarea class="input min-h-24 w-full" bind:value={rejectReason} maxlength="2000"></textarea>
+            <textarea class="input-field min-h-24 w-full" bind:value={rejectReason} maxlength="2000"></textarea>
           </label>
-          <button type="button" class="btn btn-danger" disabled={busy} onclick={reject}>
-            {$t('rejectApplication')}
-          </button>
+          <Button variant="danger" disabled={busy} onclick={reject}>{$t('rejectApplication')}</Button>
         {/if}
       </div>
     {/if}

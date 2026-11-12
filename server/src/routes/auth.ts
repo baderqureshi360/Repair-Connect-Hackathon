@@ -9,8 +9,6 @@ import {
   authenticate,
   requireRoles,
   signAccessToken,
-  signRefreshToken,
-  verifyRefreshToken,
   readRefreshCookie
 } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -23,11 +21,29 @@ import {
   loginSchema,
   notificationPrefsSchema,
   profileUpdateSchema,
-  registerSchema
+  registerSchema,
+  resetPasswordSchema,
+  staffActiveSchema,
+  staffPasswordResetSchema,
+  updateStaffSchema
 } from '../validators/schemas.js';
 import { ok } from '../utils/response.js';
 import { AppError } from '../utils/errors.js';
 import { writeAudit } from '../services/audit.js';
+import {
+  createStaff,
+  getStaffMembership,
+  listStaff,
+  resetStaffPassword,
+  setStaffActive,
+  updateStaff
+} from '../services/staff.js';
+import {
+  createRefreshSession,
+  revokeAllUserSessions,
+  revokeRefreshSessionByToken,
+  rotateRefreshSession
+} from '../services/refreshSessions.js';
 import { DEMO_ACCOUNT_EMAILS, env } from '../config/env.js';
 import {
   clearAuthCookies,
@@ -62,12 +78,18 @@ function assertDemoLoginAllowed(email: string) {
   }
 }
 
-function issueSession(
+async function issueSession(
   res: import('express').Response,
-  user: { _id: { toString(): string }; role: string }
+  user: { _id: { toString(): string }; role: string },
+  meta?: { userAgent?: string; ip?: string }
 ) {
   const accessToken = signAccessToken(user._id.toString(), user.role as never);
-  const refreshToken = signRefreshToken(user._id.toString(), user.role as never);
+  const { refreshToken } = await createRefreshSession({
+    userId: user._id.toString(),
+    role: user.role as never,
+    userAgent: meta?.userAgent,
+    ip: meta?.ip
+  });
   const csrfToken = newCsrfToken();
   setAuthCookies(res, { accessToken, refreshToken, csrfToken });
   // Vitest helpers may use Bearer; never expose JWTs outside test.
@@ -99,7 +121,10 @@ router.post('/register', authLimiter, validate(registerSchema), async (req, res,
       preferredLanguage: preferredLanguage || 'en'
     });
 
-    const session = issueSession(res, user);
+    const session = await issueSession(res, user, {
+      userAgent: req.get('user-agent') || '',
+      ip: req.ip
+    });
     await writeAudit({
       actor: user._id,
       action: 'auth.register',
@@ -158,6 +183,40 @@ router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), asy
   }
 });
 
+router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async (req, res, next) => {
+  try {
+    const tokenHash = crypto.createHash('sha256').update(String(req.body.token)).digest('hex');
+    const reset = await PasswordReset.findOne({
+      tokenHash,
+      consumedAt: null,
+      expiresAt: { $gt: new Date() }
+    });
+    if (!reset) throw new AppError('Invalid or expired reset token', 400, 'INVALID_RESET_TOKEN');
+
+    const user = await User.findById(reset.user).select('+passwordHash');
+    if (!user || !user.isActive) throw new AppError('Invalid or expired reset token', 400, 'INVALID_RESET_TOKEN');
+
+    user.passwordHash = await bcrypt.hash(req.body.newPassword, 12);
+    await user.save();
+    reset.consumedAt = new Date();
+    await reset.save();
+
+    await revokeAllUserSessions(user._id, 'password_reset');
+    clearAuthCookies(res);
+
+    await writeAudit({
+      actor: user._id,
+      action: 'auth.reset_password',
+      entityType: 'User',
+      entityId: user._id
+    });
+
+    return ok(res, { reset: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/login', authLimiter, validate(loginSchema), async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -174,9 +233,16 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res, next)
       'shop',
       'name code'
     );
-    const accountStatus = (user.accountStatus || 'active') as 'active' | 'pending_shop_owner';
-    const onboardingPending = accountStatus === 'pending_shop_owner';
-    const session = issueSession(res, user);
+    const accountStatus = (user.accountStatus || 'active') as
+      | 'active'
+      | 'pending_shop_owner'
+      | 'pending_supplier';
+    const onboardingPending =
+      accountStatus === 'pending_shop_owner' || accountStatus === 'pending_supplier';
+    const session = await issueSession(res, user, {
+      userAgent: req.get('user-agent') || '',
+      ip: req.ip
+    });
 
     await writeAudit({
       actor: user._id,
@@ -210,9 +276,12 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res, next)
 
 router.post('/logout', async (req, res, next) => {
   try {
+    const refresh = readRefreshCookie(req);
+    await revokeRefreshSessionByToken(refresh, 'logout');
     clearAuthCookies(res);
     return ok(res, { loggedOut: true });
   } catch (err) {
+    clearAuthCookies(res);
     next(err);
   }
 });
@@ -221,12 +290,30 @@ router.post('/refresh', authLimiter, async (req, res, next) => {
   try {
     const refresh = readRefreshCookie(req);
     if (!refresh) throw new AppError('Refresh token required', 401, 'UNAUTHORIZED');
-    const payload = verifyRefreshToken(refresh);
-    const user = await User.findById(payload.sub);
-    if (!user || !user.isActive) throw new AppError('Invalid session', 401, 'UNAUTHORIZED');
-    const session = issueSession(res, user);
+
+    const rotated = await rotateRefreshSession({
+      rawToken: refresh,
+      userAgent: req.get('user-agent') || '',
+      ip: req.ip
+    });
+
+    const user = await User.findById(rotated.userId);
+    if (!user || !user.isActive) {
+      await revokeAllUserSessions(rotated.userId, 'account_deactivated');
+      throw new AppError('Invalid session', 401, 'UNAUTHORIZED');
+    }
+
+    const accessToken = signAccessToken(user._id.toString(), user.role as never);
+    const csrfToken = newCsrfToken();
+    setAuthCookies(res, {
+      accessToken,
+      refreshToken: rotated.refreshToken,
+      csrfToken
+    });
+
     return ok(res, {
-      ...session,
+      csrfToken,
+      ...(env.isTest ? { token: accessToken } : {}),
       user: {
         id: user._id,
         email: user.email,
@@ -259,7 +346,10 @@ router.get('/me', authenticate, async (req, res, next) => {
       'shop',
       'name code city'
     );
-    const accountStatus = (user.accountStatus || 'active') as 'active' | 'pending_shop_owner';
+    const accountStatus = (user.accountStatus || 'active') as
+      | 'active'
+      | 'pending_shop_owner'
+      | 'pending_supplier';
     return ok(res, {
       id: user._id,
       email: user.email,
@@ -269,7 +359,8 @@ router.get('/me', authenticate, async (req, res, next) => {
       phone: user.phone,
       avatarUrl: user.avatarUrl || null,
       accountStatus,
-      onboardingPending: accountStatus === 'pending_shop_owner',
+      onboardingPending:
+        accountStatus === 'pending_shop_owner' || accountStatus === 'pending_supplier',
       notificationPreferences: user.notificationPreferences,
       preferences: user.preferences || {},
       shops: memberships
@@ -326,13 +417,19 @@ router.post('/me/password', authenticate, validate(changePasswordSchema), async 
     if (!match) throw new AppError('Current password is incorrect', 401, 'INVALID_CREDENTIALS');
     user.passwordHash = await bcrypt.hash(req.body.newPassword, 12);
     await user.save();
+    await revokeAllUserSessions(user._id, 'password_change');
+    // Re-issue session for the caller so they stay signed in after intentional password change.
+    const session = await issueSession(res, user, {
+      userAgent: req.get('user-agent') || '',
+      ip: req.ip
+    });
     await writeAudit({
       actor: req.user!.id,
       action: 'auth.password_change',
       entityType: 'User',
       entityId: user._id
     });
-    return ok(res, { changed: true });
+    return ok(res, { changed: true, ...session });
   } catch (err) {
     next(err);
   }
@@ -388,15 +485,17 @@ router.patch('/me/language', authenticate, validate(languageSchema), async (req,
 
 router.get('/staff', authenticate, requireRoles('shop_admin'), async (req, res, next) => {
   try {
-    const shopId = (req.query.shopId as string) || req.user!.shopIds[0];
-    if (!shopId || !req.user!.shopIds.includes(shopId)) {
-      throw new AppError('Shop access denied', 403, 'SHOP_FORBIDDEN');
+    const result = await listStaff(req.user!, {
+      shopId: (req.query.shopId as string) || undefined,
+      includeInactive: req.query.includeInactive === '1' || req.query.includeInactive === 'true',
+      role: (req.query.role as string) || undefined,
+      q: (req.query.q as string) || undefined
+    });
+    // Backward-compatible array when clients expect a bare list; manage UIs use ?view=manage.
+    if (req.query.view === 'manage') {
+      return ok(res, result);
     }
-    const memberships = await ShopMembership.find({ shop: shopId, isActive: true }).populate(
-      'user',
-      'name email role phone isActive'
-    );
-    return ok(res, memberships);
+    return ok(res, result.staff);
   } catch (err) {
     next(err);
   }
@@ -409,53 +508,71 @@ router.post(
   validate(createStaffSchema),
   async (req, res, next) => {
     try {
-      const { email, password, name, role, shopId, phone, preferredLanguage } = req.body;
-      if (!req.user!.shopIds.includes(shopId)) {
-        throw new AppError('Shop access denied', 403, 'SHOP_FORBIDDEN');
-      }
+      const created = await createStaff(req.user!, req.body);
+      return ok(res, created, 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
-      const existing = await User.findOne({ email: email.toLowerCase() });
-      if (existing) throw new AppError('Email already registered', 409, 'DUPLICATE');
+router.get(
+  '/staff/:membershipId',
+  authenticate,
+  requireRoles('shop_admin'),
+  async (req, res, next) => {
+    try {
+      const membership = await getStaffMembership(req.user!, String(req.params.membershipId));
+      return ok(res, membership);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
-      const passwordHash = await bcrypt.hash(password, 12);
-      const user = await User.create({
-        email,
-        passwordHash,
-        name,
-        role,
-        phone,
-        preferredLanguage: preferredLanguage || 'en'
-      });
+router.patch(
+  '/staff/:membershipId',
+  authenticate,
+  requireRoles('shop_admin'),
+  validate(updateStaffSchema),
+  async (req, res, next) => {
+    try {
+      const updated = await updateStaff(req.user!, String(req.params.membershipId), req.body);
+      return ok(res, updated);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
-      const membership = await ShopMembership.create({
-        user: user._id,
-        shop: shopId,
-        role,
-        isActive: true
-      });
-
-      await writeAudit({
-        actor: req.user!.id,
-        action: 'auth.staff_create',
-        entityType: 'User',
-        entityId: user._id,
-        shop: shopId,
-        details: { role }
-      });
-
-      return ok(
-        res,
-        {
-          user: {
-            id: user._id,
-            email: user.email,
-            name: user.name,
-            role: user.role
-          },
-          membership
-        },
-        201
+router.post(
+  '/staff/:membershipId/status',
+  authenticate,
+  requireRoles('shop_admin'),
+  validate(staffActiveSchema),
+  async (req, res, next) => {
+    try {
+      const result = await setStaffActive(
+        req.user!,
+        String(req.params.membershipId),
+        Boolean(req.body.isActive)
       );
+      return ok(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/staff/:membershipId/reset-password',
+  authenticate,
+  requireRoles('shop_admin'),
+  validate(staffPasswordResetSchema),
+  async (req, res, next) => {
+    try {
+      const result = await resetStaffPassword(req.user!, String(req.params.membershipId), req.body);
+      return ok(res, result);
     } catch (err) {
       next(err);
     }

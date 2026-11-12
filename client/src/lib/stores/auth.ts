@@ -6,6 +6,7 @@ export type Role =
   | 'mechanic'
   | 'parts_coordinator'
   | 'shop_admin'
+  | 'supplier'
   | 'platform_operator';
 
 export interface AuthUser {
@@ -15,7 +16,7 @@ export interface AuthUser {
   role: Role;
   preferredLanguage?: 'en' | 'ur';
   shops?: unknown[];
-  accountStatus?: 'active' | 'pending_shop_owner';
+  accountStatus?: 'active' | 'pending_shop_owner' | 'pending_supplier';
   onboardingPending?: boolean;
 }
 

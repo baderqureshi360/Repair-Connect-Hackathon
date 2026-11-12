@@ -18,7 +18,8 @@ export interface UserPreferences {
 
 export const defaultPreferences: UserPreferences = {
   theme: 'system',
-  accent: 'indigo',
+  /* emerald maps to Porto green in accentVars — keeps DB enum unchanged */
+  accent: 'emerald',
   density: 'comfortable',
   fontScale: 'standard',
   reducedMotion: false,
@@ -29,12 +30,22 @@ export const defaultPreferences: UserPreferences = {
 
 export const preferences = writable<UserPreferences>({ ...defaultPreferences });
 
-const accentVars: Record<Accent, { accent: string; hover: string; soft: string; focus: string }> = {
-  indigo: { accent: '#3730a3', hover: '#312e81', soft: '#eef2ff', focus: '#4f46e5' },
-  blue: { accent: '#1d4ed8', hover: '#1e40af', soft: '#eff6ff', focus: '#2563eb' },
-  teal: { accent: '#0f766e', hover: '#115e59', soft: '#f0fdfa', focus: '#0d9488' },
-  violet: { accent: '#6d28d9', hover: '#5b21b6', soft: '#f5f3ff', focus: '#7c3aed' },
-  emerald: { accent: '#047857', hover: '#065f46', soft: '#ecfdf5', focus: '#059669' }
+const accentVars: Record<
+  Accent,
+  { accent: string; hover: string; soft: string; focus: string; foreground: string }
+> = {
+  indigo: { accent: '#3730a3', hover: '#312e81', soft: '#eef2ff', focus: '#4f46e5', foreground: '#ffffff' },
+  blue: { accent: '#1d4ed8', hover: '#1e40af', soft: '#eff6ff', focus: '#2563eb', foreground: '#ffffff' },
+  teal: { accent: '#0f766e', hover: '#115e59', soft: '#f0fdfa', focus: '#0d9488', foreground: '#ffffff' },
+  violet: { accent: '#6d28d9', hover: '#5b21b6', soft: '#f5f3ff', focus: '#7c3aed', foreground: '#ffffff' },
+  /* Porto-inspired green — dark foreground for WCAG AA on primary buttons */
+  emerald: {
+    accent: '#82b440',
+    hover: '#6f9a36',
+    soft: '#eef6e3',
+    focus: '#5a8a28',
+    foreground: '#1a2e05'
+  }
 };
 
 function resolveTheme(theme: ThemePref): 'light' | 'dark' {
@@ -60,12 +71,15 @@ export function applyPreferences(prefs: Partial<UserPreferences>) {
   document.documentElement.classList.toggle('reduce-motion', next.reducedMotion);
   document.documentElement.classList.toggle('high-contrast', next.highContrast);
 
-  const vars = accentVars[next.accent] || accentVars.indigo;
+  const vars = accentVars[next.accent] || accentVars.emerald;
   const root = document.documentElement;
   root.style.setProperty('--color-accent', vars.accent);
   root.style.setProperty('--color-accent-hover', vars.hover);
   root.style.setProperty('--color-accent-soft', vars.soft);
+  root.style.setProperty('--color-accent-foreground', vars.foreground);
   root.style.setProperty('--color-focus', vars.focus);
+  root.style.setProperty('--color-primary', vars.accent);
+  root.style.setProperty('--color-primary-hover', vars.hover);
 
   localStorage.setItem('rc_prefs', JSON.stringify(next));
   localStorage.setItem('rc_theme', mode);

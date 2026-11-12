@@ -1,16 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { t, lang } from '$lib/i18n';
-  import { clearSession, user, type Role } from '$lib/stores/auth';
+  import { clearSession, user } from '$lib/stores/auth';
   import { announce, online, theme } from '$lib/stores/ui';
   import { applyPreferences, preferences, type ThemePref } from '$lib/stores/preferences';
   import { selectedShopId } from '$lib/stores/shopContext';
   import { api } from '$lib/api';
+  import { navByRole, pendingNavByRole } from '$lib/navigation/portalNav';
+  import { shortcutManager } from '$lib/keyboard/manager';
+  import { commandPaletteRequest, shortcutsHelpRequest } from '$lib/keyboard/ui';
   import Alert from './Alert.svelte';
   import ToastHost from './ToastHost.svelte';
   import Icon from './Icon.svelte';
+  import CommandPalette from './CommandPalette.svelte';
+  import ShortcutsHelp from './ShortcutsHelp.svelte';
 
   let {
     children,
@@ -32,83 +38,14 @@
   let isNarrow = $state(false);
   let shops = $state<{ id: string; name: string }[]>([]);
   let isFullscreen = $state(false);
+  let commandPaletteOpen = $state(false);
+  let shortcutsHelpOpen = $state(false);
 
-  type NavKey =
-    | 'dashboard'
-    | 'repairs'
-    | 'shops'
-    | 'findRepairShops'
-    | 'myRepairs'
-    | 'myAppointments'
-    | 'myReceipts'
-    | 'shopManagement'
-    | 'inventory'
-    | 'partsRequests'
-    | 'staff'
-    | 'notifications'
-    | 'appointments'
-    | 'suppliers'
-    | 'transfers'
-    | 'reports'
-    | 'profile'
-    | 'appearance'
-    | 'documents'
-    | 'customers'
-    | 'settings'
-    | 'applicationStatusTitle'
-    | 'shopApplications';
-
-  const pendingNav = [
-    { href: '/app/shop-application/status', key: 'applicationStatusTitle' as NavKey, icon: 'clipboard' }
-  ];
-
-  const navByRole: Record<Role, { href: string; key: NavKey; icon: string }[]> = {
-    customer: [
-      { href: '/app/customer/shops', key: 'findRepairShops', icon: 'building' },
-      { href: '/app/customer/repairs', key: 'myRepairs', icon: 'wrench' },
-      { href: '/app/customer/appointments', key: 'myAppointments', icon: 'calendar' },
-      { href: '/app/customer/receipts', key: 'myReceipts', icon: 'fileText' },
-      { href: '/app/notifications', key: 'notifications', icon: 'bell' },
-      { href: '/app/profile', key: 'profile', icon: 'user' }
-    ],
-    mechanic: [
-      { href: '/app/mechanic', key: 'dashboard', icon: 'layoutDashboard' },
-      { href: '/app/mechanic/jobs', key: 'repairs', icon: 'wrench' },
-      { href: '/app/mechanic/reports', key: 'reports', icon: 'chart' },
-      { href: '/app/notifications', key: 'notifications', icon: 'bell' },
-      { href: '/app/profile', key: 'profile', icon: 'user' },
-      { href: '/app/appearance', key: 'appearance', icon: 'palette' }
-    ],
-    parts_coordinator: [
-      { href: '/app/parts', key: 'dashboard', icon: 'layoutDashboard' },
-      { href: '/app/parts/inventory', key: 'inventory', icon: 'package' },
-      { href: '/app/parts/requests', key: 'partsRequests', icon: 'clipboard' },
-      { href: '/app/parts/suppliers', key: 'suppliers', icon: 'factory' },
-      { href: '/app/parts/transfers', key: 'transfers', icon: 'truck' },
-      { href: '/app/parts/reports', key: 'reports', icon: 'chart' },
-      { href: '/app/notifications', key: 'notifications', icon: 'bell' },
-      { href: '/app/profile', key: 'profile', icon: 'user' },
-      { href: '/app/appearance', key: 'appearance', icon: 'palette' }
-    ],
-    shop_admin: [
-      { href: '/app/admin', key: 'dashboard', icon: 'layoutDashboard' },
-      { href: '/app/admin/appointments', key: 'appointments', icon: 'calendar' },
-      { href: '/app/admin/repairs', key: 'repairs', icon: 'wrench' },
-      { href: '/app/admin/customers', key: 'customers', icon: 'users' },
-      { href: '/app/parts/inventory', key: 'inventory', icon: 'package' },
-      { href: '/app/admin/shops', key: 'shopManagement', icon: 'building' },
-      { href: '/app/admin/reports', key: 'reports', icon: 'chart' },
-      { href: '/app/admin/documents', key: 'documents', icon: 'fileText' },
-      { href: '/app/notifications', key: 'notifications', icon: 'bell' },
-      { href: '/app/admin/staff', key: 'staff', icon: 'users' },
-      { href: '/app/appearance', key: 'settings', icon: 'settings' }
-    ],
-    platform_operator: [
-      { href: '/app/platform/shop-applications', key: 'shopApplications', icon: 'clipboard' },
-      { href: '/app/profile', key: 'profile', icon: 'user' },
-      { href: '/app/appearance', key: 'appearance', icon: 'palette' }
-    ]
-  };
+  const pendingNav = $derived(
+    $user?.role === 'supplier'
+      ? pendingNavByRole.supplier || []
+      : pendingNavByRole.shop_admin || []
+  );
 
   async function refreshUnread() {
     try {
@@ -140,6 +77,10 @@
   function onShopChange(id: string) {
     selectedShopId.set(id);
     announce.set($t('shopSwitched'));
+    searchResults = null;
+    searchQ = '';
+    searchOpen = false;
+    commandPaletteOpen = false;
     // Soft refresh current view so shop-scoped pages reload.
     goto($page.url.pathname + $page.url.search, { invalidateAll: true, replaceState: true });
   }
@@ -174,32 +115,95 @@
     document.addEventListener('fullscreenchange', onFs);
     onFs();
 
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        const el = document.getElementById('global-search') as HTMLInputElement | null;
-        el?.focus();
-        searchOpen = true;
-      }
-      if (e.key === 'Escape') {
+    shortcutManager.install({
+      getRole: () => get(user)?.role ?? null,
+      getPathname: () => get(page).url.pathname,
+      getPendingOnboarding: () => pendingOnboarding,
+      navigate: (href) => goto(href),
+      openCommandPalette: () => {
+        commandPaletteOpen = true;
         searchOpen = false;
-        searchResults = null;
+      },
+      openShortcutsHelp: () => {
+        shortcutsHelpOpen = true;
       }
-    };
-    window.addEventListener('keydown', onKey);
+    });
 
     return () => {
       clearInterval(id);
       mq.removeEventListener('change', syncNarrow);
-      window.removeEventListener('keydown', onKey);
       document.removeEventListener('fullscreenchange', onFs);
+      shortcutManager.uninstall();
     };
+  });
+
+  $effect(() => {
+    if (searchOpen) {
+      shortcutManager.pushOverlay({
+        id: 'header-search',
+        close: () => {
+          searchOpen = false;
+          searchResults = null;
+        }
+      });
+    } else {
+      shortcutManager.removeOverlay('header-search');
+    }
+  });
+
+  $effect(() => {
+    if (mobileOpen) {
+      shortcutManager.pushOverlay({
+        id: 'mobile-nav',
+        close: () => {
+          mobileOpen = false;
+          const menuBtn = document.querySelector<HTMLElement>('[data-testid="open-mobile-nav"]');
+          menuBtn?.focus();
+        }
+      });
+    } else {
+      shortcutManager.removeOverlay('mobile-nav');
+    }
+  });
+
+  let lastPaletteReq = $state(0);
+  let lastHelpReq = $state(0);
+  $effect(() => {
+    const n = $commandPaletteRequest;
+    if (n > lastPaletteReq) {
+      lastPaletteReq = n;
+      commandPaletteOpen = true;
+    }
+  });
+  $effect(() => {
+    const n = $shortcutsHelpRequest;
+    if (n > lastHelpReq) {
+      lastHelpReq = n;
+      shortcutsHelpOpen = true;
+    }
   });
 
   $effect(() => {
     void $page.url.pathname;
     mobileOpen = false;
     searchOpen = false;
+    commandPaletteOpen = false;
+    shortcutsHelpOpen = false;
+  });
+
+  $effect(() => {
+    if (!mobileOpen || !isNarrow) return;
+    const panel = document.getElementById('primary-nav');
+    const focusable = panel?.querySelector<HTMLElement>(
+      'button, [href], select, input, [tabindex]:not([tabindex="-1"])'
+    );
+    focusable?.focus();
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
   });
 
   async function persistSidebar(next: boolean) {
@@ -254,11 +258,28 @@
     } catch {
       /* clear client session regardless */
     }
+    commandPaletteOpen = false;
+    shortcutsHelpOpen = false;
+    searchOpen = false;
+    searchResults = null;
+    searchQ = '';
     clearSession();
     const { clearPreferencesCache } = await import('$lib/stores/preferences');
     clearPreferencesCache();
     goto('/login');
   }
+
+  let lastPrincipalKey = $state('');
+  $effect(() => {
+    // Drop cached search/palette state only when identity/role actually changes.
+    const principalKey = `${$user?.id || ''}:${$user?.role || ''}`;
+    if (principalKey === lastPrincipalKey) return;
+    lastPrincipalKey = principalKey;
+    searchResults = null;
+    searchQ = '';
+    searchOpen = false;
+    commandPaletteOpen = false;
+  });
 
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   function onSearchInput() {
@@ -337,11 +358,19 @@
 
 <a href="#main" class="skip-link">{$t('skipToContent')}</a>
 <ToastHost />
+<CommandPalette
+  open={commandPaletteOpen}
+  {pendingOnboarding}
+  onclose={() => (commandPaletteOpen = false)}
+  onopenHelp={() => (shortcutsHelpOpen = true)}
+  onlogout={logout}
+/>
+<ShortcutsHelp open={shortcutsHelpOpen} onclose={() => (shortcutsHelpOpen = false)} />
 
 {#if mobileOpen}
   <button
     type="button"
-    class="fixed inset-0 z-40 bg-slate-950/50 lg:hidden"
+    class="fixed inset-0 z-40 bg-[color-mix(in_oklab,var(--color-ink)_45%,transparent)] lg:hidden"
     aria-label={$t('closeMenu')}
     onclick={() => (mobileOpen = false)}
   ></button>
@@ -355,17 +384,19 @@
     } ${mobileOpen ? 'fixed flex translate-x-0' : 'fixed hidden'}`}
     aria-label="Primary"
   >
-    <div class="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-3.5">
+    <div class="flex items-center justify-between gap-2 border-b border-[color:var(--color-sidebar-border)] px-3 py-3.5">
       <div class={`flex min-w-0 items-center gap-2.5 ${collapsed ? 'lg:justify-center lg:w-full' : ''}`}>
         <span class="sidebar-logo" aria-hidden="true">
           <Icon name="wrench" size={16} />
         </span>
         {#if !collapsed}
           <div class="min-w-0">
-            <p class="truncate text-sm font-bold tracking-tight text-white">{$t('appName')}</p>
+            <p class="truncate text-sm font-bold tracking-tight text-[color:var(--color-sidebar-text-active)]">
+              {$t('appName')}
+            </p>
           </div>
         {:else}
-          <p class="hidden text-xs font-bold text-white lg:sr-only">RC</p>
+          <p class="hidden text-xs font-bold text-[color:var(--color-sidebar-text-active)] lg:sr-only">RC</p>
         {/if}
       </div>
       <button
@@ -402,7 +433,8 @@
             <span class={collapsed ? 'lg:sr-only' : ''}>{$t(item.key)}</span>
             {#if item.key === 'notifications' && unread > 0}
               <span
-                class={`ms-auto inline-flex min-w-5 items-center justify-center rounded-full bg-indigo-400 px-1.5 text-[10px] font-bold text-indigo-950 ${collapsed ? 'lg:absolute lg:end-1 lg:top-1' : ''}`}
+                class={`nav-badge ms-auto ${collapsed ? 'lg:absolute lg:end-1 lg:top-1' : ''}`}
+                aria-label={`${unread} unread`}
               >
                 {unread > 99 ? '99+' : unread}
               </span>
@@ -412,13 +444,15 @@
       {/if}
     </nav>
 
-    <div class="mt-auto border-t border-white/10 p-3">
+    <div class="mt-auto border-t border-[color:var(--color-sidebar-border)] p-3">
       {#if $user}
         <div class={`mb-3 flex items-center gap-2.5 ${collapsed ? 'lg:justify-center' : ''}`}>
           <div class="sidebar-avatar" aria-hidden="true">{initials($user.name)}</div>
           <div class={`min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
-            <p class="truncate text-sm font-semibold text-white">{$user.name}</p>
-            <p class="truncate text-xs text-indigo-200/80">{roleLabel}</p>
+            <p class="truncate text-sm font-semibold text-[color:var(--color-sidebar-text-active)]">
+              {$user.name}
+            </p>
+            <p class="truncate text-xs text-[color:var(--color-sidebar-text)]">{roleLabel}</p>
           </div>
         </div>
         <div class={`mb-3 space-y-0.5 ${collapsed ? 'lg:hidden' : ''}`}>
@@ -433,7 +467,7 @@
         <label class="sr-only" for="lang-select">{$t('language')}</label>
         <select
           id="lang-select"
-          class={`rounded-md border border-white/15 bg-white/5 px-1.5 py-1 text-xs text-indigo-50 ${collapsed ? 'lg:w-full' : 'w-auto'}`}
+          class={`rounded-[var(--radius-ui)] border border-[color:var(--color-sidebar-border)] bg-white/5 px-1.5 py-1 text-xs text-[color:var(--color-sidebar-text-active)] ${collapsed ? 'lg:w-full' : 'w-auto'}`}
           value={$lang}
           onchange={(e) => switchLang((e.currentTarget as HTMLSelectElement).value as 'en' | 'ur')}
         >
@@ -453,21 +487,22 @@
     </div>
   </aside>
 
-  <div class="flex min-w-0 flex-1 flex-col">
+  <div class="flex min-w-0 flex-1 flex-col overflow-x-clip">
     <header class="sticky top-0 z-30 border-b border-border bg-surface-elevated/95 backdrop-blur">
-      <div class="flex h-14 items-center gap-2 px-3 md:px-4">
+      <div class="flex h-14 min-w-0 items-center gap-2 px-3 md:px-4">
         <button
           type="button"
           class="btn btn-outline btn-icon shrink-0 lg:hidden"
           aria-label={$t('openMenu')}
           aria-expanded={mobileOpen}
           aria-controls="primary-nav"
+          data-testid="open-mobile-nav"
           onclick={() => (mobileOpen = true)}
         >
           <Icon name="menu" size={18} />
         </button>
 
-        <p class="min-w-0 flex-1 truncate text-sm font-semibold text-accent lg:hidden">{$t('appName')}</p>
+        <p class="min-w-0 flex-1 truncate text-sm font-semibold text-ink lg:hidden">{$t('appName')}</p>
 
         <form class="relative hidden min-w-0 flex-1 md:block md:max-w-xl" onsubmit={submitSearch}>
           <label class="sr-only" for="global-search">{$t('globalSearch')}</label>
@@ -486,11 +521,14 @@
               autocomplete="off"
               aria-controls="global-search-results"
             />
-            <kbd
-              class="pointer-events-none absolute inset-y-0 end-2 my-auto hidden h-6 items-center rounded border border-border bg-surface px-1.5 text-[10px] font-medium text-muted sm:inline-flex"
+            <button
+              type="button"
+              class="absolute inset-y-0 end-1 my-auto hidden h-7 items-center rounded border border-border bg-surface px-1.5 text-[10px] font-medium text-muted hover:text-ink sm:inline-flex"
+              aria-label={$t('commandPalette')}
+              onclick={() => (commandPaletteOpen = true)}
             >
               Ctrl K
-            </kbd>
+            </button>
           </div>
           <div
             id="global-search-results"
@@ -566,6 +604,16 @@
               {shops[0].name}
             </span>
           {/if}
+
+          <button
+            type="button"
+            class="btn btn-outline btn-icon hidden sm:inline-flex"
+            aria-label={$t('keyboardShortcuts')}
+            title={`${$t('keyboardShortcuts')} (Ctrl + /)`}
+            onclick={() => (shortcutsHelpOpen = true)}
+          >
+            <Icon name="fileText" size={17} />
+          </button>
 
           <button
             type="button"
@@ -665,7 +713,7 @@
 
     <div class="sr-only" aria-live="polite">{$announce}</div>
 
-    <main id="main" class="flex-1 p-4 md:p-6">
+    <main id="main" class="min-w-0 flex-1 overflow-x-clip p-4 md:p-6">
       {@render children()}
     </main>
   </div>

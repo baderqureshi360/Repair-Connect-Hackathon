@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
+  import {
+    chartGridColor,
+    chartLabelColor,
+    chartPalette,
+    chartTickColor
+  } from '$lib/chartColors';
 
   export type ChartPoint = { label: string; value: number };
   export type ChartSeries = { label: string; points: ChartPoint[]; color?: string };
@@ -26,8 +32,6 @@
   let canvas: HTMLCanvasElement | undefined = $state();
   let chart: { destroy: () => void } | undefined;
   let renderGen = 0;
-
-  const palette = ['#4f46e5', '#38bdf8', '#0d9488', '#f59e0b', '#7c3aed', '#64748b', '#dc2626'];
 
   function resolvedSeries(): ChartSeries[] {
     if (series.length) return series;
@@ -88,9 +92,13 @@
 
     if (gen !== renderGen || !canvas) return;
 
-    const isDark = document.documentElement.classList.contains('dark');
-    const tick = isDark ? '#94a3b8' : '#64748b';
-    const grid = isDark ? 'rgba(148,163,184,0.12)' : 'rgba(15,23,42,0.06)';
+    const palette = chartPalette();
+    const tick = chartTickColor();
+    const labelColor = chartLabelColor();
+    const grid = chartGridColor();
+    const chartFont =
+      getComputedStyle(document.documentElement).getPropertyValue('--font-sans').trim() ||
+      'Helvetica Neue, Helvetica, Arial, sans-serif';
 
     if (type === 'donut') {
       const pts = dataSeries[0].points;
@@ -140,11 +148,11 @@
                   ctx.save();
                   ctx.textAlign = 'center';
                   ctx.textBaseline = 'middle';
-                  ctx.fillStyle = isDark ? '#e5e7eb' : '#0f172a';
-                  ctx.font = '700 18px IBM Plex Sans, sans-serif';
+                  ctx.fillStyle = labelColor;
+                  ctx.font = `700 18px ${chartFont}`;
                   ctx.fillText(String(total), x, y - 8);
                   ctx.fillStyle = tick;
-                  ctx.font = '500 11px IBM Plex Sans, sans-serif';
+                  ctx.font = `500 11px ${chartFont}`;
                   ctx.fillText(centerLabel, x, y + 12);
                   ctx.restore();
                 }

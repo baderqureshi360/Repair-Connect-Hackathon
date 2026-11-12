@@ -6,9 +6,10 @@ export default defineConfig({
   plugins: [tailwindcss(), sveltekit()],
   server: {
     port: 5173,
+    // Prefer IPv4 loopback so the proxy matches Express on 0.0.0.0:5000 (avoids ::1 ECONNREFUSED noise on Windows).
     proxy: {
-      '/api': 'http://localhost:5000',
-      '/health': 'http://localhost:5000'
+      '/api': 'http://127.0.0.1:5000',
+      '/health': 'http://127.0.0.1:5000'
     }
   }
 });

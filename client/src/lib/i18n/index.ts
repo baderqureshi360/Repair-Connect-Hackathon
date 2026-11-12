@@ -1,7 +1,9 @@
 import { derived, writable } from 'svelte/store';
-import { en, type MessageKey } from './en';
+import { en } from './en';
+import type { MessageKey } from './en';
 import { ur } from './ur';
 
+export type { MessageKey } from './en';
 export type Lang = 'en' | 'ur';
 
 const dictionaries = { en, ur };

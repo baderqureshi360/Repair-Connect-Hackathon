@@ -1,4 +1,4 @@
-import express, { type NextFunction, type Request, type Response } from 'express';
+import express, { type Express, type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -8,6 +8,8 @@ import { env } from './config/env.js';
 import { getDbMode } from './config/db.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { csrfProtection } from './middleware/csrf.js';
+import { fail, ok } from './utils/response.js';
+import { processOutboxBatch } from './services/outbox.js';
 import { swaggerSpec } from './swagger.js';
 import authRoutes from './routes/auth.js';
 import shopRoutes from './routes/shops.js';
@@ -24,6 +26,19 @@ import searchRoutes from './routes/search.js';
 import publicRoutes from './routes/public.js';
 import shopApplicationRoutes from './routes/shopApplications.js';
 import platformShopApplicationRoutes from './routes/platformShopApplications.js';
+import platformSupplierApplicationRoutes from './routes/platformSupplierApplications.js';
+import platformSupplierReviewRoutes from './routes/platformSupplierReviews.js';
+import supplierApplicationRoutes from './routes/supplierApplications.js';
+import supplierPortalRoutes from './routes/supplierPortal.js';
+import marketplaceSupplierRoutes from './routes/marketplaceSuppliers.js';
+import supplierNetworkRoutes from './routes/supplierNetwork.js';
+
+export type CreateAppOptions = {
+  /** Optional web handler (adapter-node or test stub). Mounted after API routes. */
+  webHandler?: RequestHandler;
+  /** Awaited before handling requests (Mongo connect / Sentry on serverless cold start). */
+  ensureReady?: () => Promise<void>;
+};
 
 function buildCspDirectives() {
   const client = env.clientUrl;
@@ -43,23 +58,42 @@ function buildCspDirectives() {
   };
 }
 
-export function createApp() {
+export function createApp(options: CreateAppOptions = {}): Express {
   const app = express();
 
   app.set('trust proxy', 1);
 
+  if (options.ensureReady) {
+    const ensureReady = options.ensureReady;
+    app.use(async (_req, _res, next) => {
+      try {
+        await ensureReady();
+        next();
+      } catch (err) {
+        next(err);
+      }
+    });
+  }
+
+  // Shared security headers for all responses. CSP is API-only so SvelteKit kit.csp
+  // (and hooks.server.ts) remain authoritative for HTML.
   app.use(
     helmet({
-      contentSecurityPolicy: env.isProd
-        ? {
-            useDefaults: true,
-            directives: buildCspDirectives()
-          }
-        : false,
+      contentSecurityPolicy: false,
       crossOriginResourcePolicy: { policy: 'cross-origin' },
       referrerPolicy: { policy: 'no-referrer' }
     })
   );
+
+  if (env.isProd) {
+    app.use(
+      '/api',
+      helmet.contentSecurityPolicy({
+        useDefaults: true,
+        directives: buildCspDirectives()
+      })
+    );
+  }
 
   const allowedOrigins = new Set(
     [env.clientUrl, process.env.CLIENT_URL_ALT].filter(Boolean) as string[]
@@ -80,13 +114,17 @@ export function createApp() {
     })
   );
 
-  app.use(express.json({ limit: '2mb' }));
   app.use(cookieParser());
-  app.use(csrfProtection);
+
+  // JSON body parsing and double-submit CSRF apply to the API only so SvelteKit
+  // form/body handling is not interfered with.
+  app.use('/api', express.json({ limit: '2mb' }));
+  app.use('/api', csrfProtection);
+
   // Production: combined access logs without response bodies. Never log Authorization/cookies.
   app.use(
     morgan(env.nodeEnv === 'test' ? 'tiny' : env.isProd ? 'combined' : 'dev', {
-      skip: (req) => req.path === '/health'
+      skip: (req) => req.path === '/health' || req.path === '/ready'
     })
   );
 
@@ -98,6 +136,27 @@ export function createApp() {
         service: 'repairconnect-api',
         env: env.nodeEnv,
         dbMode: getDbMode()
+      }
+    });
+  });
+
+  /** Readiness: process up + Mongo connected (for load balancers / orchestrators). */
+  app.get('/ready', (_req, res) => {
+    const dbMode = getDbMode();
+    if (dbMode === 'disconnected') {
+      return res.status(503).json({
+        success: false,
+        error: { message: 'Database not ready', code: 'NOT_READY' },
+        data: { status: 'not_ready', dbMode }
+      });
+    }
+    return res.json({
+      success: true,
+      data: {
+        status: 'ready',
+        service: 'repairconnect-api',
+        env: env.nodeEnv,
+        dbMode
       }
     });
   });
@@ -121,6 +180,12 @@ export function createApp() {
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/shop-applications', shopApplicationRoutes);
   app.use('/api/v1/platform/shop-applications', platformShopApplicationRoutes);
+  app.use('/api/v1/platform/supplier-applications', platformSupplierApplicationRoutes);
+  app.use('/api/v1/platform/supplier-reviews', platformSupplierReviewRoutes);
+  app.use('/api/v1/supplier-applications', supplierApplicationRoutes);
+  app.use('/api/v1/supplier', supplierPortalRoutes);
+  app.use('/api/v1/marketplace/suppliers', marketplaceSupplierRoutes);
+  app.use('/api/v1/supplier-network', supplierNetworkRoutes);
   app.use('/api/v1/shops', shopRoutes);
   app.use('/api/v1/repairs', repairRoutes);
   app.use('/api/v1/parts', partsRoutes);
@@ -133,6 +198,35 @@ export function createApp() {
   app.use('/api/v1/documents', documentsRoutes);
   app.use('/api/v1/search', searchRoutes);
 
+  /**
+   * Vercel Cron (and manual ops) drain for transactional outbox.
+   * Auth: Authorization Bearer CRON_SECRET (also skips CSRF via Bearer rule).
+   * Serverless hosts must not rely on setInterval — see startOutboxProcessor gate.
+   */
+  app.post('/api/cron/outbox', async (req, res, next) => {
+    try {
+      const secret = (process.env.CRON_SECRET || '').trim();
+      const auth = String(req.headers.authorization || '');
+      if (!secret || auth !== `Bearer ${secret}`) {
+        return fail(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      }
+      const delivered = await processOutboxBatch();
+      return ok(res, { delivered });
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  // Unknown API routes must not fall through to SvelteKit HTML.
+  app.use('/api', (_req, res) => {
+    return fail(res, 'Not found', 404, 'NOT_FOUND');
+  });
+
   app.use(errorHandler);
+
+  if (options.webHandler) {
+    app.use(options.webHandler);
+  }
+
   return app;
 }

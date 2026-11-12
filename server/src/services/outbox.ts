@@ -168,6 +168,12 @@ export function kickOutboxProcessor() {
 
 export function startOutboxProcessor(intervalMs = 4000) {
   if (env.isTest || timer) return;
+  // Vercel / serverless: no reliable long-lived interval. Use kickOutboxProcessor on
+  // writes + POST /api/cron/outbox (CRON_SECRET) instead.
+  if (process.env.VERCEL || process.env.DISABLE_OUTBOX_INTERVAL === 'true') {
+    console.log('[outbox] Interval processor disabled (serverless / explicit flag)');
+    return;
+  }
   timer = setInterval(() => {
     void processOutboxBatch().catch(() => undefined);
   }, intervalMs);
