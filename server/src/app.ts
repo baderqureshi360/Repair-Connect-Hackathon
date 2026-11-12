@@ -1,7 +1,9 @@
 import express, { type Express, type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import { default as helmet } from 'helmet';
+import helmetModule from 'helmet';
+import { contentSecurityPolicy } from 'helmet';
+import type { HelmetOptions } from 'helmet';
 import morgan from 'morgan';
 import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env.js';
@@ -32,6 +34,16 @@ import supplierApplicationRoutes from './routes/supplierApplications.js';
 import supplierPortalRoutes from './routes/supplierPortal.js';
 import marketplaceSupplierRoutes from './routes/marketplaceSuppliers.js';
 import supplierNetworkRoutes from './routes/supplierNetwork.js';
+
+/**
+ * Helmet 8 is a dual package (`import` → index.mjs, `require` → index.cjs) with
+ * `"types": "./index.d.cts"` and no `exports.types` condition. Under `moduleResolution:
+ * NodeNext`, TypeScript often types the default binding as `typeof import("helmet")`
+ * (a non-callable namespace) → TS2349. Runtime ESM default is the callable middleware.
+ */
+const helmet = helmetModule as unknown as ((options?: Readonly<HelmetOptions>) => RequestHandler) & {
+  contentSecurityPolicy: typeof contentSecurityPolicy;
+};
 
 export type CreateAppOptions = {
   /** Optional web handler (adapter-node or test stub). Mounted after API routes. */
