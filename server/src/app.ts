@@ -1,7 +1,7 @@
 import express, { type Express, type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import helmet from 'helmet';
+import { default as helmet } from 'helmet';
 import morgan from 'morgan';
 import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env.js';
