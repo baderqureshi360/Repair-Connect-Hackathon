@@ -26,14 +26,6 @@
   let fieldErrors = $state<Record<string, string>>({});
   let result = $state<any>(null);
 
-  function toggleCategory(id: string) {
-    if (serviceCategories.includes(id)) {
-      serviceCategories = serviceCategories.filter((c) => c !== id);
-    } else {
-      serviceCategories = [...serviceCategories, id];
-    }
-  }
-
   function splitList(text: string) {
     return text
       .split(',')
@@ -66,8 +58,7 @@
     return Object.keys(errs).length === 0;
   }
 
-  async function onSubmit(e: Event) {
-    e.preventDefault();
+  async function submitApplication() {
     error = '';
     result = null;
     if (!validateClient()) {
@@ -80,6 +71,7 @@
       const res = await fetch(`${base}/api/v1/public/shop-applications/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(25_000),
         body: JSON.stringify({
           ownerName: ownerName.trim(),
           ownerEmail: ownerEmail.trim(),
@@ -111,6 +103,12 @@
       loading = false;
     }
   }
+
+  function onSubmit(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    void submitApplication();
+  }
 </script>
 
 <svelte:head>
@@ -135,7 +133,11 @@
       </div>
     </div>
   {:else}
-    <form class="mt-6 space-y-6" onsubmit={onSubmit} novalidate>
+    <!--
+      No method/action: a native POST to this page hits SvelteKit with no form actions
+      ("POST method not allowed") and reloads the form, aborting the client fetch.
+    -->
+    <form class="mt-6 space-y-6" novalidate onsubmit={onSubmit}>
       {#if error}
         <Alert type="error" role="alert" message={error} />
       {/if}
@@ -214,8 +216,18 @@
           <legend class="mb-2 text-sm font-medium">{$t('serviceCategory')} <span class="text-danger">*</span></legend>
           <div class="grid gap-2 sm:grid-cols-2">
             {#each SERVICE_CATEGORIES as cat}
+              <!--
+                Implicit label wrapping only (no for= — for=+nested input double-toggles in Chromium).
+                bind:group syncs checkbox value ids into serviceCategories for mouse, keyboard, and Playwright.
+              -->
               <label class="inline-flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={serviceCategories.includes(cat.id)} onchange={() => toggleCategory(cat.id)} />
+                <input
+                  id="service-cat-{cat.id}"
+                  name="serviceCategories"
+                  type="checkbox"
+                  value={cat.id}
+                  bind:group={serviceCategories}
+                />
                 {cat.label}
               </label>
             {/each}
@@ -254,9 +266,15 @@
       </label>
       {#if fieldErrors.termsAccepted}<p class="text-xs text-danger" role="alert">{fieldErrors.termsAccepted}</p>{/if}
 
-      <Button type="submit" variant="primary" loading={loading} class="w-full">
+      <!-- type=submit + onsubmit preventDefault: mouse, keyboard Enter, and Playwright -->
+      <button
+        type="submit"
+        class="btn btn-primary w-full"
+        disabled={loading}
+        aria-busy={loading || undefined}
+      >
         {loading ? $t('loading') : $t('submitShopApplication')}
-      </Button>
+      </button>
     </form>
   {/if}
 </main>

@@ -16,12 +16,15 @@ import { PART_CATEGORY_IDS } from '../constants/partCategories.js';
 const router = Router();
 
 const isTest = process.env.NODE_ENV === 'test';
+/** Same escape hatch as auth routes — Playwright webServer sets DISABLE_AUTH_RATE_LIMIT=1. */
+const skipE2ERateLimit = () => isTest || process.env.DISABLE_AUTH_RATE_LIMIT === '1';
 
 const trackLookupLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isTest ? 10_000 : 30,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipE2ERateLimit,
   message: { success: false, error: { message: 'Too many tracking attempts', code: 'RATE_LIMITED' } }
 });
 
@@ -30,6 +33,7 @@ const shopAppLimiter = rateLimit({
   max: isTest ? 10_000 : 10,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipE2ERateLimit,
   message: { success: false, error: { message: 'Too many applications', code: 'RATE_LIMITED' } }
 });
 
@@ -38,6 +42,7 @@ const supplierAppLimiter = rateLimit({
   max: isTest ? 10_000 : 10,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipE2ERateLimit,
   message: { success: false, error: { message: 'Too many applications', code: 'RATE_LIMITED' } }
 });
 

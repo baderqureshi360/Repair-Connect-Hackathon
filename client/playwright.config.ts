@@ -15,7 +15,8 @@ export default defineConfig({
   webServer: [
     {
       command: 'npm run dev -w server',
-      url: 'http://localhost:5000/health',
+      // /ready waits for Mongo; /health can pass before the first Atlas connect completes.
+      url: 'http://localhost:5000/ready',
       // E2E may reuse an already-running API. When Playwright starts the server,
       // disable auth rate limits so multi-role suites are not flaky.
       reuseExistingServer: !process.env.CI,
@@ -23,7 +24,9 @@ export default defineConfig({
       cwd: '..',
       env: {
         ...process.env,
-        DISABLE_AUTH_RATE_LIMIT: '1'
+        NODE_ENV: 'development',
+        DISABLE_AUTH_RATE_LIMIT: '1',
+        SERVE_WEB: 'false'
       }
     },
     {
