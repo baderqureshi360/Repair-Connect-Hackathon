@@ -14,7 +14,7 @@
     "test:a11y": "playwright test tests/a11y.spec.ts"
   },
   "engines": {
-    "node": "20.x"
+    "node": "26.x"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
