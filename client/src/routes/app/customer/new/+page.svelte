@@ -92,12 +92,41 @@
     loading = true;
     const idempotencyKey = crypto.randomUUID();
     try {
+      let appointmentAt: string | undefined;
+      if (form.appointmentAt?.trim()) {
+        const when = new Date(form.appointmentAt);
+        if (Number.isNaN(when.getTime())) {
+          error = 'Appointment time is invalid. Pick a valid date and time.';
+          toasts.error(error);
+          loading = false;
+          return;
+        }
+        appointmentAt = when.toISOString();
+      }
       const payload = {
-        ...form,
-        appointmentAt: form.appointmentAt ? new Date(form.appointmentAt).toISOString() : undefined,
-        photos,
+        shopId: form.shopId,
+        deviceType: form.deviceType.trim(),
+        brand: form.brand.trim(),
+        model: form.model.trim(),
+        serialNumber: form.serialNumber.trim() || undefined,
+        accessories: form.accessories.trim() || undefined,
+        problemDescription: form.problemDescription.trim(),
+        appointmentAt,
+        photos: photos.length ? photos : undefined,
         idempotencyKey
       };
+      if (!payload.shopId) {
+        error = 'Please select a repair shop.';
+        toasts.error(error);
+        loading = false;
+        return;
+      }
+      if (payload.problemDescription.length < 5) {
+        error = 'Describe the problem in at least 5 characters.';
+        toasts.error(error);
+        loading = false;
+        return;
+      }
       const repair = await api<any>('/api/v1/repairs', {
         method: 'POST',
         idempotencyKey,

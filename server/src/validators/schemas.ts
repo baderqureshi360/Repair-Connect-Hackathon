@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import { strongPasswordSchema } from './password.js';
+import {
+  nullableDateTimeString,
+  optionalDateTimeString,
+  optionalFormString,
+  requiredDateTimeString
+} from './dateTime.js';
 
 /** Public self-registration — customers only. Privileged roles are rejected. */
 export const registerSchema = z.object({
@@ -61,35 +67,39 @@ export const languageSchema = z.object({
 });
 
 const photoInputSchema = z.object({
-  url: z.string().min(1).max(400_000),
+  // Allow ~350KB binary uploads after base64 expansion (~4/3) plus data-URL prefix.
+  url: z.string().min(1).max(500_000),
   caption: z.string().max(200).optional(),
   kind: z.enum(['device', 'before', 'after', 'other']).optional(),
   visibility: z.enum(['customer', 'internal']).optional()
 });
 
 export const repairCreateSchema = z.object({
-  shopId: z.string().min(1),
-  deviceType: z.string().min(1).max(80),
-  brand: z.string().min(1).max(80),
-  model: z.string().min(1).max(80),
-  serialNumber: z.string().max(120).optional(),
-  accessories: z.string().max(500).optional(),
-  problemDescription: z.string().min(5).max(2000),
+  shopId: z.string().min(1, 'Please select a repair shop'),
+  deviceType: z.string().min(1, 'Device type is required').max(80),
+  brand: z.string().min(1, 'Brand is required').max(80),
+  model: z.string().min(1, 'Model is required').max(80),
+  serialNumber: optionalFormString(120),
+  accessories: optionalFormString(500),
+  problemDescription: z
+    .string()
+    .min(5, 'Describe the problem in at least 5 characters')
+    .max(2000),
   photos: z.array(photoInputSchema).max(5).optional(),
-  appointmentAt: z.string().datetime().optional(),
+  appointmentAt: optionalDateTimeString,
   idempotencyKey: z.string().min(8).max(120).optional()
 });
 
 export const appointmentCreateSchema = z.object({
-  shopId: z.string().min(1),
-  startsAt: z.string().datetime(),
-  notes: z.string().max(500).optional(),
+  shopId: z.string().min(1, 'Please select a repair shop'),
+  startsAt: requiredDateTimeString,
+  notes: optionalFormString(500),
   repairRequestId: z.string().optional()
 });
 
 export const appointmentRescheduleSchema = z.object({
-  startsAt: z.string().datetime(),
-  notes: z.string().max(500).optional()
+  startsAt: requiredDateTimeString,
+  notes: optionalFormString(500)
 });
 
 export const feedbackSchema = z.object({
@@ -99,7 +109,7 @@ export const feedbackSchema = z.object({
 
 export const mechanicUpdateSchema = z.object({
   priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
-  deadline: z.string().datetime().nullable().optional(),
+  deadline: nullableDateTimeString,
   laborMinutes: z.number().int().min(0).optional(),
   customerNotes: z.string().max(2000).optional(),
   internalNotes: z.string().max(2000).optional(),
@@ -141,7 +151,7 @@ export const transferCreateSchema = z.object({
   reason: z.string().max(500).optional(),
   repairRequestId: z.string().optional(),
   partsRequestId: z.string().optional(),
-  expectedArrivalDate: z.string().datetime().optional(),
+  expectedArrivalDate: optionalDateTimeString,
   /** Only true when the date is verified — otherwise UI shows Unconfirmed. */
   expectedArrivalConfirmed: z.boolean().optional(),
   reserveOnReceive: z.boolean().optional()
@@ -208,8 +218,8 @@ export const appearancePrefsSchema = z
 
 export const analyticsQuerySchema = z.object({
   range: z.enum(['7d', '30d', '90d', 'custom']).default('30d'),
-  from: z.string().datetime().optional(),
-  to: z.string().datetime().optional(),
+  from: optionalDateTimeString,
+  to: optionalDateTimeString,
   shopId: z.string().optional()
 });
 

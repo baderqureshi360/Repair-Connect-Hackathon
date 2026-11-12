@@ -1,5 +1,17 @@
 import { clearSession, csrfToken, getCsrfToken, syncCsrfFromCookie } from './stores/auth';
 import { announce, online } from './stores/ui';
+import {
+  messageFromFailedResponse,
+  statusToErrorCode,
+  type ApiErrorBody
+} from './apiErrors';
+
+export {
+  formatValidationDetails,
+  messageFromFailedResponse,
+  statusToErrorCode,
+  type ApiErrorBody
+} from './apiErrors';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -13,35 +25,6 @@ export class ApiError extends Error {
     this.code = code;
     this.details = details;
   }
-}
-
-export type ApiErrorBody = {
-  success?: boolean;
-  error?: { message?: string; code?: string; details?: unknown };
-  data?: { csrfToken?: string } & Record<string, unknown>;
-};
-
-/** Prefer API error message; surface proxy/unreachable cases instead of generic "Request failed". */
-export function messageFromFailedResponse(res: Response, body: ApiErrorBody): string {
-  const apiMsg = body?.error?.message;
-  if (typeof apiMsg === 'string' && apiMsg.trim()) return apiMsg;
-
-  if (res.status === 502 || res.status === 503 || res.status === 504) {
-    return 'API server unreachable. Start the backend (npm run dev:server) on port 5000.';
-  }
-  if (res.status >= 500) {
-    return 'Server error. If this persists, confirm the API is running and reachable.';
-  }
-  if (res.status === 429) return 'Too many attempts. Please wait and try again.';
-  if (res.statusText) return `Request failed (${res.status} ${res.statusText})`;
-  return `Request failed (${res.status || 'network'})`;
-}
-
-export function statusToErrorCode(status: number): string {
-  if (status === 502 || status === 503 || status === 504) return 'API_UNREACHABLE';
-  if (status >= 500) return 'SERVER_ERROR';
-  if (status === 429) return 'RATE_LIMIT';
-  return 'ERROR';
 }
 
 async function readApiBody(res: Response): Promise<ApiErrorBody> {
