@@ -1,5 +1,5 @@
 /**
- * Vercel-recognized Express entry (`src/server.ts`).
- * Same singleton as `src/index.ts` — do not create a second app instance.
+ * Re-exports the `src/app.ts` singleton.
+ * Vercel selects `src/app.ts` first because that file imports Express.
  */
 export { app as default } from './httpApp.js';

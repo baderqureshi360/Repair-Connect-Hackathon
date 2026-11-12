@@ -10,17 +10,14 @@ import type { Server } from 'node:http';
 const isVercel = Boolean(process.env.VERCEL);
 
 /**
- * Shared Express app for:
- * - Vercel (default export — no listen / no outbox interval)
- * - Persistent hosts (listen + optional SvelteKit mount + outbox interval)
+ * Persistent-process entry. Vercel does not load this file: its Express
+ * builder uses `src/app.ts`'s default export and must not call listen().
  */
 export default app;
 
 async function main() {
   if (isVercel) {
-    // Vercel loads this module and uses `export default app`.
-    // Do not call listen() or start setInterval outbox here.
-    console.log('[server] Vercel mode: exporting Express app (serverless)');
+    console.log('[server] Vercel mode: skip listen/outbox (serverless entry is src/app.ts)');
     return;
   }
 

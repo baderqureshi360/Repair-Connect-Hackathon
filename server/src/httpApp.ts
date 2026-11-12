@@ -1,4 +1,2 @@
-import { createBootstrappedApp } from './bootstrapApp.js';
-
-/** Singleton Express application used by Vercel export and persistent listen. */
-export const app = createBootstrappedApp();
+/** Same singleton constructed in `app.ts` (Vercel default export). */
+export { app } from './app.js';

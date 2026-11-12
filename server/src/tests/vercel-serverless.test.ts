@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
-import { createApp } from '../app.js';
+import expressApp, { createApp } from '../app.js';
+import { app as singleton } from '../httpApp.js';
 import { User } from '../models/index.js';
 import { ACCESS_COOKIE, CSRF_COOKIE } from '../utils/cookies.js';
 import { env } from '../config/env.js';
@@ -100,6 +101,15 @@ describe('Vercel dual-project deployment guards', () => {
   it('health remains public for Vercel probes', async () => {
     const app = createApp();
     const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.data.service).toBe('repairconnect-api');
+  });
+
+  it('default export is the shared Express app Vercel invokes', async () => {
+    expect(expressApp).toBe(singleton);
+    expect(typeof expressApp).toBe('function');
+    expect(typeof expressApp.listen).toBe('function');
+    const res = await request(expressApp).get('/health');
     expect(res.status).toBe(200);
     expect(res.body.data.service).toBe('repairconnect-api');
   });

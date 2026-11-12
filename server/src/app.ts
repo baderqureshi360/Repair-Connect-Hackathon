@@ -34,6 +34,7 @@ import supplierApplicationRoutes from './routes/supplierApplications.js';
 import supplierPortalRoutes from './routes/supplierPortal.js';
 import marketplaceSupplierRoutes from './routes/marketplaceSuppliers.js';
 import supplierNetworkRoutes from './routes/supplierNetwork.js';
+import { createBootstrappedApp } from './bootstrapApp.js';
 
 /**
  * Helmet 8 is a dual package (`import` → index.mjs, `require` → index.cjs) with
@@ -242,3 +243,11 @@ export function createApp(options: CreateAppOptions = {}): Express {
 
   return app;
 }
+
+/**
+ * Vercel Express entry detection prefers `src/app.ts` (it imports `express`) over
+ * `src/index.ts` and `src/server.ts`. The default export must be this Express app.
+ * One singleton: persistent `index.ts` re-exports it and is the only place that calls listen().
+ */
+export const app = createBootstrappedApp();
+export default app;
