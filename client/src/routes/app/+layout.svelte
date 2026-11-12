@@ -4,7 +4,7 @@
   import { page } from '$app/stores';
   import AppShell from '$lib/components/AppShell.svelte';
   import { api } from '$lib/api';
-  import { clearSession, setSession, sessionActive, type AuthUser } from '$lib/stores/auth';
+  import { clearSession, getCsrfToken, setSession, sessionActive, type AuthUser } from '$lib/stores/auth';
   import { applyPreferences, clearPreferencesCache } from '$lib/stores/preferences';
 
   let { children } = $props();
@@ -14,7 +14,17 @@
   onMount(async () => {
     try {
       const me = await api<AuthUser & { preferences?: Record<string, unknown> }>('/api/v1/auth/me');
-      setSession(me);
+      // Cross-origin: rc_csrf is not readable from the SPA; restore from API when needed.
+      let csrf = getCsrfToken() || undefined;
+      if (!csrf && import.meta.env.VITE_API_URL) {
+        try {
+          const minted = await api<{ csrfToken: string }>('/api/v1/auth/csrf');
+          csrf = minted.csrfToken;
+        } catch {
+          /* non-fatal — mutations may still fail CSRF until next login */
+        }
+      }
+      setSession(me, csrf);
       if (me.preferences) applyPreferences(me.preferences as never);
       const pendingShop = me.accountStatus === 'pending_shop_owner';
       const pendingSupplier = me.accountStatus === 'pending_supplier';

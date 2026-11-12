@@ -52,8 +52,14 @@ export function getCsrfToken(): string | null {
 export function setSession(nextUser: AuthUser, nextCsrf?: string) {
   sessionActive.set(true);
   user.set(nextUser);
-  if (nextCsrf) csrfToken.set(nextCsrf);
-  else csrfToken.set(readCsrfCookie());
+  if (nextCsrf) {
+    csrfToken.set(nextCsrf);
+  } else {
+    // Cross-origin API cookies are not visible to document.cookie on the SPA origin.
+    // Prefer an explicit token from the JSON body; only fall back to a readable cookie.
+    const fromCookie = readCsrfCookie();
+    if (fromCookie) csrfToken.set(fromCookie);
+  }
   if (browser) {
     localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
     localStorage.removeItem('rc_token');
@@ -71,5 +77,7 @@ export function clearSession() {
 }
 
 export function syncCsrfFromCookie() {
-  csrfToken.set(readCsrfCookie());
+  const fromCookie = readCsrfCookie();
+  // Never wipe an in-memory CSRF from login/refresh when the cookie is on another site.
+  if (fromCookie) csrfToken.set(fromCookie);
 }

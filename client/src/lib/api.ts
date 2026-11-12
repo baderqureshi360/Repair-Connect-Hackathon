@@ -58,7 +58,22 @@ type ApiOptions = RequestInit & { idempotencyKey?: string; full?: boolean; skipR
 
 async function tryRefresh(): Promise<boolean> {
   try {
-    const csrf = getCsrfToken();
+    syncCsrfFromCookie();
+    let csrf = getCsrfToken();
+    // Cross-site SPA cannot read rc_csrf via document.cookie — mint via API if needed.
+    if (!csrf && API_BASE) {
+      const bootstrap = await fetch(`${API_BASE}/api/v1/auth/csrf`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+      if (bootstrap.ok) {
+        const body = await bootstrap.json().catch(() => ({}));
+        if (body?.data?.csrfToken) {
+          csrfToken.set(body.data.csrfToken);
+          csrf = body.data.csrfToken;
+        }
+      }
+    }
     const headers = new Headers({ 'Content-Type': 'application/json' });
     if (csrf) headers.set('X-CSRF-Token', csrf);
     const res = await fetch(`${API_BASE}/api/v1/auth/refresh`, {

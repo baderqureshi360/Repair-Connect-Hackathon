@@ -107,11 +107,18 @@ function assertConfig(useMemoryDb: boolean): void {
 const useMemoryDb = resolveUseMemoryDb();
 assertConfig(useMemoryDb);
 
-const sameSiteRaw = (process.env.COOKIE_SAME_SITE || (isProd ? 'lax' : 'lax')).toLowerCase();
+/**
+ * Split Vercel hosts (`*.vercel.app` frontend + API) are cross-site (public suffix).
+ * Browsers omit SameSite=Lax cookies on credentialed cross-origin XHR/fetch — refresh then
+ * fails with "Refresh token required". Default to None on Vercel unless explicitly overridden.
+ * Same-origin / Enzonic (no VERCEL) keeps Lax.
+ */
+const sameSiteDefault = process.env.VERCEL ? 'none' : 'lax';
+const sameSiteRaw = (process.env.COOKIE_SAME_SITE || sameSiteDefault).toLowerCase();
 const cookieSameSite =
   sameSiteRaw === 'none' || sameSiteRaw === 'strict' || sameSiteRaw === 'lax'
     ? (sameSiteRaw as 'none' | 'strict' | 'lax')
-    : 'lax';
+    : sameSiteDefault;
 
 export const DEMO_ACCOUNT_EMAILS = [
   'customer@repairconnect.local',
