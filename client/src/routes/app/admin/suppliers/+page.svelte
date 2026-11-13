@@ -6,6 +6,7 @@
   import { PART_CATEGORIES, partCategoryLabel } from '$lib/partCategories';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
 
   type Metric = { value: number | null; sampleCount: number; enoughData: boolean; label: string };
   type SupplierCard = {
@@ -163,18 +164,19 @@
   }
 </script>
 
-<section class="space-y-6">
-  <header>
-    <h1 class="text-2xl font-semibold">{$t('supplierMarketplace')}</h1>
-    <p class="mt-1 text-sm text-muted">{$t('supplierMarketplaceHint')}</p>
-  </header>
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
+  <PageHeader
+    title={$t('supplierMarketplace')}
+    subtitle={$t('supplierMarketplaceHint')}
+    breadcrumbs={[{ label: $t('home'), href: '/app/admin' }, { label: $t('supplierMarketplace') }]}
+  />
 
   <div class="flex flex-wrap gap-2" role="tablist" aria-label="Marketplace views">
     <button
       type="button"
       role="tab"
       aria-selected={mode === 'products'}
-      class={`rounded-md px-3 py-1.5 text-sm ${mode === 'products' ? 'bg-accent text-white' : 'border border-border'}`}
+      class={`btn btn-sm ${mode === 'products' ? 'btn-primary' : 'btn-outline'}`}
       onclick={() => {
         mode = 'products';
         load();
@@ -186,7 +188,7 @@
       type="button"
       role="tab"
       aria-selected={mode === 'suppliers'}
-      class={`rounded-md px-3 py-1.5 text-sm ${mode === 'suppliers' ? 'bg-accent text-white' : 'border border-border'}`}
+      class={`btn btn-sm ${mode === 'suppliers' ? 'btn-primary' : 'btn-outline'}`}
       onclick={() => {
         mode = 'suppliers';
         load();
@@ -196,7 +198,7 @@
     </button>
   </div>
 
-  <div class="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" role="search">
+  <div class="surface-card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" role="search">
     <label class="text-sm" for="mkt-city"
       >{$t('city')}
       {#if cities.length}

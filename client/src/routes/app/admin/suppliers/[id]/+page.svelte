@@ -8,6 +8,8 @@
   import { selectedShopId } from '$lib/stores/shopContext';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
 
   let profile = $state<any>(null);
   let eligible = $state<any[]>([]);
@@ -105,97 +107,48 @@
     if (!m) return $t('notEnoughData');
     return `${m.label} (n=${m.sampleCount ?? 0})`;
   }
+
+  const categoryLabels: Record<string, string> = {
+    productQuality: 'Quality',
+    deliveryPerformance: 'Delivery',
+    communication: 'Communication',
+    orderFulfilment: 'Fulfilment',
+    overallExperience: 'Overall'
+  };
 </script>
 
-<section class="space-y-6">
-  <button type="button" class="text-sm text-accent underline" onclick={() => goto('/app/admin/suppliers')}>
-    ← {$t('supplierMarketplace')}
-  </button>
-
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
   {#if loading}
-    <p class="text-muted">{$t('loading')}</p>
-  {:else if error}
+    <div class="space-y-3" role="status" aria-busy="true" aria-label={$t('loading')}>
+      <Skeleton class="h-10 w-2/3 max-w-md" />
+      <Skeleton class="h-28 w-full" />
+      <Skeleton class="h-48 w-full" />
+    </div>
+  {:else if error && !profile}
+    <PageHeader
+      title={$t('supplierMarketplace')}
+      breadcrumbs={[
+        { label: $t('home'), href: '/app/admin' },
+        { label: $t('supplierMarketplace'), href: '/app/admin/suppliers' }
+      ]}
+    />
     <Alert type="error" role="alert" message={error} />
+    <Button variant="outline" onclick={load}>{$t('retry')}</Button>
   {:else if profile}
-    <header class="flex items-start gap-4">
-      {#if profile.logoUrl}
-        <img src={profile.logoUrl} alt="" class="h-16 w-16 rounded object-cover" />
-      {/if}
-      <div>
-        <h1 class="text-2xl font-semibold">{profile.businessName}</h1>
-        <p class="text-sm text-muted">{profile.city}{profile.region ? `, ${profile.region}` : ''}</p>
-        {#if profile.verified}
-          <p class="text-sm text-accent">{$t('verified')} supplier</p>
-        {/if}
-        <p class="text-sm">
-          {$t('genuineRating')}: {profile.reviewSummary?.label || $t('notEnoughData')}
-        </p>
-        <p class="text-sm">{$t('fulfilmentRate')}: {metric(profile.fulfilmentPerformance)}</p>
-        <p class="text-sm">{$t('onTimeDelivery')}: {metric(profile.onTimeDeliveryPerformance)}</p>
-        <p class="text-sm text-muted">
-          Pending overdue: {profile.pendingOverdueShipments?.label || 'No pending overdue shipments'}
-        </p>
-      </div>
-    </header>
-
-    {#if profile.reviewBreakdown}
-      <div class="grid gap-2 sm:grid-cols-5 text-sm rounded-lg border border-border p-3">
-        <p>Quality: {profile.reviewBreakdown.productQuality}★</p>
-        <p>Delivery: {profile.reviewBreakdown.deliveryPerformance}★</p>
-        <p>Comm: {profile.reviewBreakdown.communication}★</p>
-        <p>Fulfilment: {profile.reviewBreakdown.orderFulfilment}★</p>
-        <p>Overall: {profile.reviewBreakdown.overallExperience}★</p>
-      </div>
-    {/if}
-
-    <dl class="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2">
-      <div class="sm:col-span-2">
-        <dt class="text-xs uppercase text-muted">{$t('businessDescription')}</dt>
-        <dd class="whitespace-pre-wrap">{profile.description || '—'}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase text-muted">{$t('partCategories')}</dt>
-        <dd>{(profile.partCategories || []).map(partCategoryLabel).join(', ') || '—'}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase text-muted">{$t('supportedBrands')}</dt>
-        <dd>{(profile.supportedBrands || []).join(', ') || '—'}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase text-muted">{$t('deliveryCoverage')}</dt>
-        <dd>{(profile.deliveryCities || []).join(', ') || '—'}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase text-muted">{$t('availability')}</dt>
-        <dd class="capitalize">{profile.availability}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase text-muted">{$t('contactPerson')}</dt>
-        <dd>{profile.contactPerson}</dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase text-muted">{$t('phone')}</dt>
-        <dd>
-          <a class="text-accent underline" href={`tel:${profile.businessPhone}`}>{profile.businessPhone}</a>
-        </dd>
-      </div>
-      <div>
-        <dt class="text-xs uppercase text-muted">{$t('email')}</dt>
-        <dd>
-          <a class="text-accent underline" href={`mailto:${profile.businessEmail}`}>{profile.businessEmail}</a>
-        </dd>
-      </div>
-      <div class="sm:col-span-2">
-        <dt class="text-xs uppercase text-muted">{$t('address')}</dt>
-        <dd>{profile.address}</dd>
-      </div>
-    </dl>
-
-    <div class="flex flex-wrap gap-2">
-      <Button variant="primary" href={`mailto:${profile.businessEmail}`}>{$t('contactSupplier')}</Button>
-      <Button variant="outline" href={`tel:${profile.businessPhone}`}>{$t('phone')}</Button>
+    <PageHeader
+      title={profile.businessName}
+      subtitle={`${profile.city}${profile.region ? `, ${profile.region}` : ''}${profile.verified ? ` · ${$t('verified')}` : ''}`}
+      breadcrumbs={[
+        { label: $t('home'), href: '/app/admin' },
+        { label: $t('supplierMarketplace'), href: '/app/admin/suppliers' },
+        { label: profile.businessName }
+      ]}
+    >
+      <Button variant="primary" size="sm" href={`mailto:${profile.businessEmail}`}>{$t('contactSupplier')}</Button>
+      <Button variant="outline" size="sm" href={`tel:${profile.businessPhone}`}>{$t('phone')}</Button>
       <Button
         variant="outline"
+        size="sm"
         onclick={async () => {
           try {
             if (!$selectedShopId) {
@@ -218,60 +171,166 @@
       >
         {$t('startConversation')}
       </Button>
-      <Button variant="outline" href="/app/admin/rfqs">{$t('requestQuote')}</Button>
+      <Button variant="outline" size="sm" href="/app/admin/rfqs">{$t('requestQuote')}</Button>
+    </PageHeader>
+
+    {#if error}
+      <Alert type="error" role="alert" message={error} />
+    {/if}
+
+    <div class="surface-card flex flex-col gap-4 p-4 sm:flex-row sm:items-start md:p-5">
+      {#if profile.logoUrl}
+        <img
+          src={profile.logoUrl}
+          alt=""
+          class="h-16 w-16 shrink-0 rounded-[var(--radius-ui)] border border-border object-cover"
+        />
+      {/if}
+      <div class="grid min-w-0 flex-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+        <p>
+          <span class="block text-xs font-semibold uppercase tracking-wide text-muted">{$t('genuineRating')}</span>
+          {profile.reviewSummary?.label || $t('notEnoughData')}
+        </p>
+        <p>
+          <span class="block text-xs font-semibold uppercase tracking-wide text-muted">{$t('fulfilmentRate')}</span>
+          {metric(profile.fulfilmentPerformance)}
+        </p>
+        <p>
+          <span class="block text-xs font-semibold uppercase tracking-wide text-muted">{$t('onTimeDelivery')}</span>
+          {metric(profile.onTimeDeliveryPerformance)}
+        </p>
+        <p class="sm:col-span-2 lg:col-span-3 text-muted">
+          Pending overdue: {profile.pendingOverdueShipments?.label || 'No pending overdue shipments'}
+        </p>
+      </div>
     </div>
 
-    <section class="space-y-3">
-      <h2 class="text-lg font-semibold">{$t('verifiedReviews')}</h2>
+    {#if profile.reviewBreakdown}
+      <div class="surface-card grid gap-3 p-4 text-sm sm:grid-cols-5" role="list">
+        <p role="listitem">
+          <span class="block text-xs text-muted">Quality</span>
+          <span class="font-semibold tabular-nums">{profile.reviewBreakdown.productQuality}★</span>
+        </p>
+        <p role="listitem">
+          <span class="block text-xs text-muted">Delivery</span>
+          <span class="font-semibold tabular-nums">{profile.reviewBreakdown.deliveryPerformance}★</span>
+        </p>
+        <p role="listitem">
+          <span class="block text-xs text-muted">Comm</span>
+          <span class="font-semibold tabular-nums">{profile.reviewBreakdown.communication}★</span>
+        </p>
+        <p role="listitem">
+          <span class="block text-xs text-muted">Fulfilment</span>
+          <span class="font-semibold tabular-nums">{profile.reviewBreakdown.orderFulfilment}★</span>
+        </p>
+        <p role="listitem">
+          <span class="block text-xs text-muted">Overall</span>
+          <span class="font-semibold tabular-nums">{profile.reviewBreakdown.overallExperience}★</span>
+        </p>
+      </div>
+    {/if}
+
+    <dl class="surface-card grid gap-4 p-4 text-sm sm:grid-cols-2 md:p-5">
+      <div class="sm:col-span-2">
+        <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{$t('businessDescription')}</dt>
+        <dd class="mt-1 whitespace-pre-wrap text-ink">{profile.description || '—'}</dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{$t('partCategories')}</dt>
+        <dd class="mt-1">{(profile.partCategories || []).map(partCategoryLabel).join(', ') || '—'}</dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{$t('supportedBrands')}</dt>
+        <dd class="mt-1">{(profile.supportedBrands || []).join(', ') || '—'}</dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{$t('deliveryCoverage')}</dt>
+        <dd class="mt-1">{(profile.deliveryCities || []).join(', ') || '—'}</dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{$t('availability')}</dt>
+        <dd class="mt-1 capitalize">{profile.availability}</dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{$t('contactPerson')}</dt>
+        <dd class="mt-1">{profile.contactPerson}</dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{$t('phone')}</dt>
+        <dd class="mt-1">
+          <a class="font-medium hover:underline" href={`tel:${profile.businessPhone}`}>{profile.businessPhone}</a>
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{$t('email')}</dt>
+        <dd class="mt-1">
+          <a class="font-medium hover:underline" href={`mailto:${profile.businessEmail}`}>{profile.businessEmail}</a>
+        </dd>
+      </div>
+      <div class="sm:col-span-2">
+        <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{$t('address')}</dt>
+        <dd class="mt-1">{profile.address}</dd>
+      </div>
+    </dl>
+
+    <section class="space-y-3" aria-labelledby="verified-reviews-heading">
+      <h2 id="verified-reviews-heading" class="text-sm font-semibold text-ink">{$t('verifiedReviews')}</h2>
       {#if !(profile.recentReviews || []).length}
-        <p class="text-sm text-muted">{$t('notEnoughData')} — no published verified reviews yet.</p>
+        <p class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-8 text-center text-sm text-muted" role="status">
+          {$t('notEnoughData')} — no published verified reviews yet.
+        </p>
       {:else}
-        {#each profile.recentReviews as review}
-          <article class="rounded-lg border border-border p-3 space-y-1">
-            <p class="text-sm font-medium">
-              {review.rating}★ · PO {review.purchaseOrderPublicId}
-              <span class="text-xs text-muted"> · verified</span>
-            </p>
-            {#if review.comment}<p class="text-sm whitespace-pre-wrap">{review.comment}</p>{/if}
-            {#if review.supplierResponse}
-              <p class="text-xs text-muted">Supplier: {review.supplierResponse.body}</p>
-            {/if}
-            <Button size="sm" variant="outline" onclick={() => reportReview(review.id)}>Report</Button>
-          </article>
-        {/each}
+        <ul class="space-y-3" role="list">
+          {#each profile.recentReviews as review}
+            <li class="surface-card space-y-2 p-4">
+              <p class="text-sm font-medium text-ink">
+                {review.rating}★ · PO {review.purchaseOrderPublicId}
+                <span class="text-xs font-normal text-muted"> · verified</span>
+              </p>
+              {#if review.comment}<p class="text-sm whitespace-pre-wrap text-muted">{review.comment}</p>{/if}
+              {#if review.supplierResponse}
+                <p class="text-xs text-muted">Supplier: {review.supplierResponse.body}</p>
+              {/if}
+              <Button size="sm" variant="outline" onclick={() => reportReview(review.id)}>Report</Button>
+            </li>
+          {/each}
+        </ul>
       {/if}
     </section>
 
-    <section class="space-y-3">
-      <h2 class="text-lg font-semibold">{$t('catalog')}</h2>
+    <section class="space-y-3" aria-labelledby="catalog-heading">
+      <h2 id="catalog-heading" class="text-sm font-semibold text-ink">{$t('catalog')}</h2>
       {#if !(profile.catalog || []).length}
-        <p class="text-sm text-muted">No catalog items published.</p>
+        <p class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-8 text-center text-sm text-muted" role="status">
+          No catalog items published.
+        </p>
       {:else}
-        <div class="overflow-x-auto rounded-lg border border-border">
-          <table class="min-w-full text-left text-sm">
-            <thead class="bg-surface-elevated text-muted">
+        <div class="data-table-shell">
+          <table class="min-w-full text-start text-sm">
+            <caption class="sr-only">{$t('catalog')}</caption>
+            <thead class="border-b border-border text-muted">
               <tr>
-                <th class="px-3 py-2">Name</th>
-                <th class="px-3 py-2">SKU / MPN</th>
-                <th class="px-3 py-2">{$t('partCategories')}</th>
-                <th class="px-3 py-2">Brand</th>
-                <th class="px-3 py-2">Price</th>
-                <th class="px-3 py-2">MOQ / Lead</th>
-                <th class="px-3 py-2">Status</th>
+                <th class="px-3 py-2" scope="col">Name</th>
+                <th class="px-3 py-2" scope="col">SKU / MPN</th>
+                <th class="px-3 py-2" scope="col">{$t('partCategories')}</th>
+                <th class="px-3 py-2" scope="col">Brand</th>
+                <th class="px-3 py-2" scope="col">Price</th>
+                <th class="px-3 py-2" scope="col">MOQ / Lead</th>
+                <th class="px-3 py-2" scope="col">Status</th>
               </tr>
             </thead>
             <tbody>
               {#each profile.catalog as item}
                 <tr class="border-t border-border {item.discontinued || item.unavailable ? 'opacity-70' : ''}">
-                  <td class="px-3 py-2">{item.name}</td>
-                  <td class="px-3 py-2 text-xs">
+                  <td class="px-3 py-2 font-medium">{item.name}</td>
+                  <td class="px-3 py-2 text-xs text-muted">
                     {item.sku || '—'}
                     {#if item.manufacturerPartNumber}<br />{item.manufacturerPartNumber}{/if}
                   </td>
                   <td class="px-3 py-2">{partCategoryLabel(item.category)}</td>
                   <td class="px-3 py-2">{item.brand || '—'}</td>
-                  <td class="px-3 py-2">{item.currency} {item.unitPrice}</td>
-                  <td class="px-3 py-2 text-xs">{item.minOrderQuantity ?? 1} / {item.leadTimeDays ?? 0}d</td>
+                  <td class="px-3 py-2 tabular-nums">{item.currency} {item.unitPrice}</td>
+                  <td class="px-3 py-2 text-xs tabular-nums">{item.minOrderQuantity ?? 1} / {item.leadTimeDays ?? 0}d</td>
                   <td class="px-3 py-2 capitalize">
                     {(item.stockStatus || (item.inStock ? 'in_stock' : 'out_of_stock')).replaceAll('_', ' ')}
                     {#if item.discontinued}<span class="text-danger"> · discontinued</span>{/if}
@@ -284,42 +343,48 @@
       {/if}
     </section>
 
-    <section class="space-y-3 rounded-lg border border-border p-4">
-      <h2 class="text-lg font-semibold">Submit verified review</h2>
-      <p class="text-xs text-muted">
-        Only fulfilled or closed purchase orders with accepted goods receipts are eligible. One review per PO.
-      </p>
+    <section class="surface-card space-y-4 p-4 md:p-5" aria-labelledby="submit-review-heading">
+      <div>
+        <h2 id="submit-review-heading" class="text-sm font-semibold text-ink">Submit verified review</h2>
+        <p class="mt-1 text-xs text-muted">
+          Only fulfilled or closed purchase orders with accepted goods receipts are eligible. One review per PO.
+        </p>
+      </div>
       {#if reviewMsg}<Alert type="success" role="status" message={reviewMsg} />{/if}
       {#if !eligible.length}
-        <p class="text-sm text-muted">No eligible purchase orders for this supplier.</p>
+        <p class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-6 text-center text-sm text-muted" role="status">
+          No eligible purchase orders for this supplier.
+        </p>
       {:else}
-        <label class="block text-sm"
-          >Purchase order
-          <select class="input-field mt-1 w-full" bind:value={purchaseOrderId}>
+        <div>
+          <label class="field-label" for="eligible-po">Purchase order</label>
+          <select id="eligible-po" class="input-field w-full" bind:value={purchaseOrderId}>
             {#each eligible as po}
               <option value={po.publicId}>{po.publicId} · {po.status}</option>
             {/each}
           </select>
-        </label>
-        <div class="grid gap-2 sm:grid-cols-5">
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {#each Object.keys(cats) as key}
-            <label class="block text-sm"
-              >{key}
+            <div>
+              <label class="field-label" for={`cat-${key}`}>{categoryLabels[key] || key}</label>
               <input
+                id={`cat-${key}`}
                 type="number"
                 min="1"
                 max="5"
-                class="input-field mt-1 w-full"
+                class="input-field w-full"
                 bind:value={cats[key as keyof typeof cats]}
               />
-            </label>
+            </div>
           {/each}
         </div>
-        <label class="block text-sm"
-          >{$t('notes')}
-          <textarea class="input-field mt-1 w-full" rows="2" bind:value={reviewComment}></textarea>
-        </label>
-        <Button variant="outline" onclick={submitReview}>Submit verified review</Button>
+        <div>
+          <label class="field-label" for="review-notes">{$t('notes')}</label>
+          <textarea id="review-notes" class="input-field min-h-[4.5rem] w-full" rows="2" bind:value={reviewComment}
+          ></textarea>
+        </div>
+        <Button variant="primary" onclick={submitReview}>Submit verified review</Button>
       {/if}
     </section>
   {/if}

@@ -3,6 +3,7 @@
   import { SERVICE_CATEGORIES } from '$lib/serviceCategories';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
 
   let ownerName = $state('');
   let ownerEmail = $state('');
@@ -115,8 +116,11 @@
   <title>{$t('shopRegistrationTitle')} — RepairConnect</title>
 </svelte:head>
 
-<main class="mx-auto min-h-screen max-w-2xl px-4 py-10">
-  <a href="/" class="text-sm text-link hover:underline">← {$t('home')}</a>
+<main class="mx-auto min-h-dvh max-w-2xl px-4 py-10">
+  <a href="/" class="mb-4 inline-flex items-center gap-2.5 text-sm font-semibold text-ink hover:opacity-90">
+    <BrandMark size={32} compact />
+    <span>{$t('appName')}</span>
+  </a>
   <h1 class="mt-4 text-2xl font-bold">{$t('shopRegistrationTitle')}</h1>
   <p class="mt-2 text-sm text-muted">{$t('shopRegistrationOwnerHint')}</p>
 

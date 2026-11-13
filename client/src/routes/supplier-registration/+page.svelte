@@ -3,6 +3,7 @@
   import { PART_CATEGORIES } from '$lib/partCategories';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
 
   let contactPerson = $state('');
   let email = $state('');
@@ -146,8 +147,11 @@
   <title>{$t('supplierRegistrationTitle')} — RepairConnect</title>
 </svelte:head>
 
-<main class="mx-auto min-h-screen max-w-2xl px-4 py-10">
-  <p class="mb-4 text-sm"><a class="text-accent underline" href="/">← RepairConnect</a></p>
+<main class="mx-auto min-h-dvh max-w-2xl px-4 py-10">
+  <a href="/" class="mb-4 inline-flex items-center gap-2.5 text-sm font-semibold text-ink hover:opacity-90">
+    <BrandMark size={32} compact />
+    <span>{$t('appName')}</span>
+  </a>
   <h1 class="text-2xl font-semibold">{$t('supplierRegistrationTitle')}</h1>
   <p class="mt-2 text-sm text-muted">{$t('supplierRegistrationHint')}</p>
 

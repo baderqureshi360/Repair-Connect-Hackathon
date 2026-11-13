@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
   import { api, ApiError } from '$lib/api';
   import { t } from '$lib/i18n';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
 
   let data = $state<any>(null);
   let loading = $state(true);
@@ -48,32 +49,40 @@
   }
 </script>
 
-<section class="space-y-4">
-  <button type="button" class="text-sm text-accent underline" onclick={() => goto(`/app/admin/rfqs/${id}`)}>
-    ← RFQ
-  </button>
-  <h1 class="text-2xl font-semibold">{$t('compareQuotations')}</h1>
-  <p class="text-sm text-muted">Review each offer carefully. No quotation is auto-selected by price.</p>
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
+  <PageHeader
+    title={$t('compareQuotations')}
+    subtitle="Review each offer carefully. No quotation is auto-selected by price."
+    breadcrumbs={[
+      { label: $t('home'), href: '/app/admin' },
+      { label: $t('rfqs'), href: '/app/admin/rfqs' },
+      { label: id || 'RFQ', href: `/app/admin/rfqs/${id}` },
+      { label: $t('compareQuotations') }
+    ]}
+  />
 
   {#if error}<Alert type="error" role="alert" message={error} />{/if}
   {#if okMsg}<Alert type="success" role="status" message={okMsg} />{/if}
 
   {#if loading}
-    <p class="text-muted">{$t('loading')}</p>
+    <div class="space-y-2" role="status" aria-busy="true" aria-label={$t('loading')}>
+      {#each Array.from({ length: 3 }) as _}<Skeleton class="h-12" />{/each}
+    </div>
   {:else if data}
     <p class="text-sm text-muted" role="note">{data.note}</p>
 
-    <div class="overflow-x-auto rounded-lg border border-border">
-      <table class="min-w-full text-left text-sm">
-        <thead class="bg-surface-elevated text-muted">
+    <div class="data-table-shell">
+      <table class="min-w-full text-start text-sm">
+        <caption class="sr-only">{$t('compareQuotations')}</caption>
+        <thead class="border-b border-border text-muted">
           <tr>
-            <th class="px-3 py-2">Supplier</th>
-            <th class="px-3 py-2">Subtotal</th>
-            <th class="px-3 py-2">Delivery</th>
-            <th class="px-3 py-2">Tax</th>
-            <th class="px-3 py-2">Total</th>
-            <th class="px-3 py-2">ETA / Warranty</th>
-            <th class="px-3 py-2">Select</th>
+            <th class="px-3 py-2" scope="col">Supplier</th>
+            <th class="px-3 py-2" scope="col">Subtotal</th>
+            <th class="px-3 py-2" scope="col">Delivery</th>
+            <th class="px-3 py-2" scope="col">Tax</th>
+            <th class="px-3 py-2" scope="col">Total</th>
+            <th class="px-3 py-2" scope="col">ETA / Warranty</th>
+            <th class="px-3 py-2" scope="col">Select</th>
           </tr>
         </thead>
         <tbody>
@@ -107,14 +116,15 @@
       </table>
     </div>
 
-    <h2 class="text-lg font-semibold">Line comparison</h2>
-    <div class="overflow-x-auto rounded-lg border border-border">
-      <table class="min-w-full text-left text-sm">
-        <thead class="bg-surface-elevated text-muted">
+    <h2 class="text-sm font-semibold text-ink">Line comparison</h2>
+    <div class="data-table-shell">
+      <table class="min-w-full text-start text-sm">
+        <caption class="sr-only">Line comparison</caption>
+        <thead class="border-b border-border text-muted">
           <tr>
-            <th class="px-3 py-2">Item</th>
+            <th class="px-3 py-2" scope="col">Item</th>
             {#each data.columns || [] as col}
-              <th class="px-3 py-2">{col.supplier?.businessName || col.publicId}</th>
+              <th class="px-3 py-2" scope="col">{col.supplier?.businessName || col.publicId}</th>
             {/each}
           </tr>
         </thead>

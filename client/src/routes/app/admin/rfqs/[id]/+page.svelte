@@ -6,6 +6,9 @@
   import { t } from '$lib/i18n';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
+  import StatusPill from '$lib/components/StatusPill.svelte';
 
   let detail = $state<any>(null);
   let loading = $state(true);
@@ -54,65 +57,71 @@
   }
 </script>
 
-<section class="space-y-4">
-  <button type="button" class="text-sm text-accent underline" onclick={() => goto('/app/admin/rfqs')}>← {$t('rfqs')}</button>
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
   {#if error}<Alert type="error" role="alert" message={error} />{/if}
   {#if okMsg}<Alert type="success" role="status" message={okMsg} />{/if}
   {#if loading}
-    <p class="text-muted">{$t('loading')}</p>
+    <div class="space-y-2" role="status" aria-busy="true" aria-label={$t('loading')}>
+      {#each Array.from({ length: 3 }) as _}<Skeleton class="h-12" />{/each}
+    </div>
   {:else if detail}
-    <header class="flex flex-wrap items-start justify-between gap-2">
-      <div>
-        <h1 class="text-2xl font-semibold">{detail.title}</h1>
-        <p class="text-sm text-muted">{detail.publicId} · <span class="capitalize">{detail.status.replaceAll('_', ' ')}</span></p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        {#if detail.status === 'draft'}
-          <Button variant="primary" onclick={send}>Send RFQ</Button>
-        {/if}
-        {#if ['sent', 'partially_responded'].includes(detail.status)}
-          <Button variant="primary" href={`/app/admin/rfqs/${detail.publicId}/compare`}>{$t('compareQuotations')}</Button>
-        {/if}
-        {#if detail.status === 'completed'}
-          <Button
-            variant="primary"
-            onclick={async () => {
-              try {
-                const po = await api<{ publicId: string }>('/api/v1/supplier-network/purchase-orders', {
-                  method: 'POST',
-                  body: JSON.stringify({ rfqId: detail.publicId, issue: true })
-                });
-                goto(`/app/admin/purchase-orders/${po.publicId}`);
-              } catch (err) {
-                error = err instanceof ApiError ? err.message : $t('errorGeneric');
-              }
-            }}
-          >
-            {$t('createPurchaseOrder')}
-          </Button>
-        {/if}
-        {#if !['completed', 'cancelled', 'expired'].includes(detail.status)}
-          <Button variant="outline" onclick={cancel}>Cancel</Button>
-        {/if}
-      </div>
-    </header>
+    <PageHeader
+      title={detail.title}
+      subtitle={detail.publicId}
+      breadcrumbs={[
+        { label: $t('home'), href: '/app/admin' },
+        { label: $t('rfqs'), href: '/app/admin/rfqs' },
+        { label: detail.publicId }
+      ]}
+    >
+      <StatusPill status={detail.status} />
+      {#if detail.status === 'draft'}
+        <Button variant="primary" size="sm" onclick={send}>Send RFQ</Button>
+      {/if}
+      {#if ['sent', 'partially_responded'].includes(detail.status)}
+        <Button variant="primary" size="sm" href={`/app/admin/rfqs/${detail.publicId}/compare`}>{$t('compareQuotations')}</Button>
+      {/if}
+      {#if detail.status === 'completed'}
+        <Button
+          variant="primary"
+          size="sm"
+          onclick={async () => {
+            try {
+              const po = await api<{ publicId: string }>('/api/v1/supplier-network/purchase-orders', {
+                method: 'POST',
+                body: JSON.stringify({ rfqId: detail.publicId, issue: true })
+              });
+              goto(`/app/admin/purchase-orders/${po.publicId}`);
+            } catch (err) {
+              error = err instanceof ApiError ? err.message : $t('errorGeneric');
+            }
+          }}
+        >
+          {$t('createPurchaseOrder')}
+        </Button>
+      {/if}
+      {#if !['completed', 'cancelled', 'expired'].includes(detail.status)}
+        <Button variant="outline" size="sm" onclick={cancel}>{$t('cancel')}</Button>
+      {/if}
+    </PageHeader>
 
-    <p class="text-sm whitespace-pre-wrap">{detail.additionalRequirements || '—'}</p>
+    <p class="surface-card p-4 text-sm whitespace-pre-wrap text-muted">{detail.additionalRequirements || '—'}</p>
 
-    <div class="overflow-x-auto rounded-lg border border-border">
-      <table class="min-w-full text-left text-sm">
-        <thead class="bg-surface-elevated text-muted">
+    <div class="data-table-shell">
+      <table class="min-w-full text-start text-sm">
+        <caption class="sr-only">RFQ items</caption>
+        <thead class="border-b border-border text-muted">
           <tr>
-            <th class="px-3 py-2">Item</th>
-            <th class="px-3 py-2">Qty</th>
-            <th class="px-3 py-2">Specs</th>
+            <th class="px-3 py-2" scope="col">Item</th>
+            <th class="px-3 py-2" scope="col">Qty</th>
+            <th class="px-3 py-2" scope="col">Specs</th>
           </tr>
         </thead>
         <tbody>
           {#each detail.items || [] as item}
             <tr class="border-t border-border">
               <td class="px-3 py-2">{item.name}</td>
-              <td class="px-3 py-2">{item.quantity}</td>
+              <td class="px-3 py-2 tabular-nums">{item.quantity}</td>
               <td class="px-3 py-2">{item.specifications || '—'}</td>
             </tr>
           {/each}
@@ -120,14 +129,16 @@
       </table>
     </div>
 
-    <section>
-      <h2 class="text-lg font-semibold">Quotations</h2>
+    <section class="surface-card space-y-2 p-4">
+      <h2 class="text-sm font-semibold text-ink">Quotations</h2>
       {#if !(detail.quotations || []).length}
-        <p class="text-sm text-muted">No quotations yet.</p>
+        <p class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-6 text-center text-sm text-muted" role="status">
+          No quotations yet.
+        </p>
       {:else}
-        <ul class="mt-2 space-y-2">
+        <ul class="space-y-2" role="list">
           {#each detail.quotations as q}
-            <li class="rounded border border-border px-3 py-2 text-sm">
+            <li class="rounded-[var(--radius-ui)] border border-border px-3 py-2.5 text-sm">
               {q.publicId} · {q.status} · {q.currency} {q.totalAmount}
             </li>
           {/each}

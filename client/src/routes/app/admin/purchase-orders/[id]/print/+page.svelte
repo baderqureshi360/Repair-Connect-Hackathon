@@ -4,6 +4,8 @@
   import { api, ApiError } from '$lib/api';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
 
   let doc = $state<any>(null);
   let error = $state('');
@@ -25,24 +27,27 @@
 </svelte:head>
 
 {#if loading}
-  <p>Loading…</p>
+  <Skeleton class="h-64 w-full" />
 {:else if error}
   <Alert type="error" role="alert" message={error} />
 {:else if doc}
-  <div class="no-print mb-4 flex gap-2">
+  <div class="no-print mb-4 flex flex-wrap gap-2">
     <Button type="button" onclick={() => window.print()}>Print / Save PDF</Button>
     <Button href={`/app/admin/purchase-orders/${doc.publicId}`} variant="outline">Back</Button>
   </div>
 
-  <article class="print-doc print-a4 bg-white text-black">
-    <header class="mb-4 border-b border-slate-300 pb-3">
-      <h1 class="text-xl font-bold">{doc.shop?.name || 'RepairConnect Shop'}</h1>
-      <p class="text-sm">{doc.shop?.address}, {doc.shop?.city}</p>
-      <p class="text-sm">{doc.shop?.phone}</p>
+  <article class="print-doc print-a4">
+    <header class="mb-4 flex items-start justify-between gap-3 border-b border-slate-300 pb-3">
+      <div>
+        <h1 class="text-xl font-bold">{doc.shop?.name || 'RepairConnect Shop'}</h1>
+        <p class="text-sm">{doc.shop?.address}, {doc.shop?.city}</p>
+        <p class="text-sm">{doc.shop?.phone}</p>
+      </div>
+      <BrandMark size={40} compact class="no-print shrink-0 opacity-90 print:!hidden" />
     </header>
 
     <h2 class="mb-2 text-lg font-semibold">Purchase Order {doc.publicId}</h2>
-    <div class="mb-4 grid gap-1 text-sm">
+    <div class="print-meta">
       <p><strong>Status:</strong> {doc.status}</p>
       <p><strong>Supplier:</strong> {doc.supplier?.businessName}</p>
       <p><strong>Supplier address:</strong> {doc.supplier?.address}, {doc.supplier?.city}</p>
@@ -53,7 +58,7 @@
       </p>
     </div>
 
-    <table class="mb-4 w-full border-collapse text-sm">
+    <table class="mb-4 text-sm">
       <thead>
         <tr class="border-b border-slate-400 text-left">
           <th class="py-1">Item</th>
@@ -76,11 +81,13 @@
       </tbody>
     </table>
 
-    <div class="ml-auto w-56 text-sm">
+    <div class="print-totals">
       <p class="flex justify-between"><span>Subtotal</span><span>{doc.subtotal}</span></p>
       <p class="flex justify-between"><span>Tax</span><span>{doc.taxAmount}</span></p>
       <p class="flex justify-between"><span>Delivery</span><span>{doc.deliveryCharges}</span></p>
-      <p class="flex justify-between font-semibold"><span>Grand total</span><span>{doc.grandTotal} {doc.currency}</span></p>
+      <p class="flex justify-between border-t border-slate-300 pt-1 font-semibold">
+        <span>Grand total</span><span>{doc.grandTotal} {doc.currency}</span>
+      </p>
     </div>
 
     {#if doc.terms}
@@ -88,16 +95,3 @@
     {/if}
   </article>
 {/if}
-
-<style>
-  @media print {
-    :global(.no-print) {
-      display: none !important;
-    }
-  }
-  .print-a4 {
-    max-width: 210mm;
-    margin: 0 auto;
-    padding: 12mm;
-  }
-</style>

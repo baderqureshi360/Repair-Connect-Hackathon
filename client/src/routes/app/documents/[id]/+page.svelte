@@ -49,7 +49,7 @@
   </div>
 
   <article
-    class={`print-doc bg-white text-black ${format === 'a4' ? 'print-a4' : format === 'thermal80' ? 'print-80' : 'print-58'}`}
+    class={`print-doc ${format === 'a4' ? 'print-a4' : format === 'thermal80' ? 'print-80' : 'print-58'}`}
     lang={doc.snapshot?.settings?.printLanguage || 'en'}
     dir={doc.snapshot?.settings?.printLanguage === 'ur' ? 'rtl' : 'ltr'}
   >
@@ -158,32 +158,7 @@
 {/if}
 
 <style>
-  .print-doc {
-    margin: 0 auto;
-    padding: 1.25rem;
-    box-shadow: 0 0 0 1px #e2e8f0;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-  .print-a4 {
-    max-width: 800px;
-  }
-  .print-80 {
-    max-width: 302px;
-    font-size: 12px;
-  }
-  .print-58 {
-    max-width: 220px;
-    font-size: 11px;
-  }
-  .print-doc table {
-    break-inside: auto;
-  }
-  .print-doc tr,
-  .print-doc img {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
+  /* Isolation so only the document prints (shell still in DOM). */
   @media print {
     @page {
       margin: 12mm;
@@ -202,20 +177,12 @@
       max-width: none !important;
       margin: 0;
       padding: 0;
-      box-shadow: none;
-      color: #000 !important;
-      background: #fff !important;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
     }
     .print-doc.print-80 {
       max-width: 80mm !important;
     }
     .print-doc.print-58 {
       max-width: 58mm !important;
-    }
-    .no-print {
-      display: none !important;
     }
   }
 </style>

@@ -13,8 +13,9 @@
   import AnalyticsChart from './AnalyticsChart.svelte';
 
   let {
-    allowedCategories = ['repairs', 'financial', 'inventory', 'mechanics', 'customers']
-  }: { allowedCategories?: string[] } = $props();
+    allowedCategories = ['repairs', 'financial', 'inventory', 'mechanics', 'customers'],
+    showHeader = true
+  }: { allowedCategories?: string[]; showHeader?: boolean } = $props();
 
   let category = $state('repairs');
   let from = $state(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
@@ -95,21 +96,28 @@
   const rowKeys = $derived(report?.rows?.length ? Object.keys(report.rows[0]) : []);
 </script>
 
-<section class="space-y-6 print:space-y-3">
-  <PageHeader title={$t('reportsCenter')} subtitle={$t('shopPerformance')}>
-    <Button variant="outline" onclick={exportCsv}>{$t('exportCsv')}</Button>
-    <Button variant="secondary" onclick={printReport}>Print</Button>
-  </PageHeader>
+<section class="min-w-0 space-y-5 overflow-x-clip print:space-y-3 md:space-y-6">
+  {#if showHeader}
+    <PageHeader title={$t('reportsCenter')} subtitle={$t('shopPerformance')}>
+      <Button variant="outline" size="sm" onclick={exportCsv}>{$t('exportCsv')}</Button>
+      <Button variant="secondary" size="sm" onclick={printReport}>{$t('printReport')}</Button>
+    </PageHeader>
+  {:else}
+    <div class="no-print flex flex-wrap gap-2">
+      <Button variant="outline" size="sm" onclick={exportCsv}>{$t('exportCsv')}</Button>
+      <Button variant="secondary" size="sm" onclick={printReport}>Print</Button>
+    </div>
+  {/if}
 
   <form
-    class="flex flex-wrap items-end gap-3 print:hidden"
+    class="surface-card no-print flex flex-wrap items-end gap-3 p-3 md:p-4"
     onsubmit={(e) => {
       e.preventDefault();
       load();
     }}
   >
     <div>
-      <label class="mb-1 block text-sm" for="report-category">Category</label>
+      <label class="field-label" for="report-category">Category</label>
       <select id="report-category" class="input-field w-auto" bind:value={category} onchange={load}>
         {#each allowedCategories as c}
           <option value={c}>{c}</option>
@@ -117,14 +125,14 @@
       </select>
     </div>
     <div>
-      <label class="mb-1 block text-sm" for="from">{$t('from')}</label>
+      <label class="field-label" for="from">{$t('from')}</label>
       <input id="from" type="date" class="input-field" bind:value={from} />
     </div>
     <div>
-      <label class="mb-1 block text-sm" for="to">{$t('to')}</label>
+      <label class="field-label" for="to">{$t('to')}</label>
       <input id="to" type="date" class="input-field" bind:value={to} />
     </div>
-    <Button type="submit">{$t('refresh')}</Button>
+    <Button type="submit" size="sm">{$t('refresh')}</Button>
     {#if $user?.role === 'shop_admin' || $user?.role === 'parts_coordinator'}
       <p class="text-xs text-muted">Shop filter follows the header shop selector.</p>
     {/if}
@@ -145,7 +153,7 @@
       </div>
     {/if}
 
-    <div class="overflow-x-auto rounded-xl border border-border bg-surface-elevated">
+    <div class="data-table-shell">
       <table class="min-w-full text-sm">
         <caption class="sr-only">{category} report</caption>
         <thead>

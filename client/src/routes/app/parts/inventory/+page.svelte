@@ -262,7 +262,7 @@
       </select>
     </div>
 
-    <div class="overflow-x-auto rounded-[var(--radius-ui)] border border-border bg-surface-elevated">
+    <div class="data-table-shell">
       <table class="min-w-full text-sm">
         <caption class="sr-only">{$t('inventory')}</caption>
         <thead class="border-b border-border text-start">

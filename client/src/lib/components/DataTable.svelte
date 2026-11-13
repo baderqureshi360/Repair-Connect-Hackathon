@@ -191,7 +191,7 @@
   {/if}
 
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div class="overflow-x-auto rounded-lg border border-border bg-surface-elevated shadow-ui">
+  <div class="data-table-shell">
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <table
       class="min-w-full text-sm"

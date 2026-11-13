@@ -10,5 +10,5 @@
     subtitle={$t('partsWelcomeSubtitle')}
     breadcrumbs={[{ label: $t('home'), href: '/app/parts' }, { label: $t('reports') }]}
   />
-  <ReportsCenter allowedCategories={['inventory']} />
+  <ReportsCenter allowedCategories={['inventory']} showHeader={false} />
 </section>

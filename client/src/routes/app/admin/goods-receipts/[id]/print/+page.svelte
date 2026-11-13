@@ -4,6 +4,7 @@
   import { api, ApiError } from '$lib/api';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
 
   let doc = $state<any>(null);
   let error = $state('');
@@ -21,33 +22,50 @@
   });
 </script>
 
+<svelte:head>
+  <title>{doc?.publicId || 'GRN'} — RepairConnect</title>
+</svelte:head>
+
 {#if loading}
-  <p>Loading…</p>
+  <Skeleton class="h-64 w-full" />
 {:else if error}
   <Alert type="error" role="alert" message={error} />
 {:else if doc}
-  <div class="no-print mb-4 flex flex-wrap gap-2">
-    <label for="fmt">Format</label>
+  <div class="no-print mb-4 flex flex-wrap items-center gap-2">
+    <label class="text-sm" for="fmt">Format</label>
     <select id="fmt" class="input-field w-auto" bind:value={format}>
       <option value="a4">A4</option>
       <option value="thermal80">80mm</option>
       <option value="thermal58">58mm</option>
     </select>
     <Button type="button" onclick={() => window.print()}>Print</Button>
+    {#if doc.purchaseOrderPublicId}
+      <Button href={`/app/admin/purchase-orders/${doc.purchaseOrderPublicId}`} variant="outline">Back to PO</Button>
+    {/if}
   </div>
 
   <article
-    class={`print-doc bg-white text-black ${format === 'a4' ? 'print-a4' : format === 'thermal80' ? 'print-receipt' : 'print-58'}`}
+    class={`print-doc ${format === 'a4' ? 'print-a4' : format === 'thermal80' ? 'print-80' : 'print-58'}`}
   >
-    <h1 class="text-lg font-bold">{doc.shop?.name}</h1>
+    <header class="mb-3 border-b border-slate-300 pb-2">
+      <h1 class="text-lg font-bold">{doc.shop?.name || 'RepairConnect Shop'}</h1>
+      {#if doc.shop?.address || doc.shop?.city}
+        <p class="text-sm">{doc.shop?.address}{doc.shop?.city ? `, ${doc.shop.city}` : ''}</p>
+      {/if}
+      {#if doc.shop?.phone}
+        <p class="text-sm">{doc.shop.phone}</p>
+      {/if}
+    </header>
     <h2 class="mb-2 font-semibold">Goods Received Note {doc.publicId}</h2>
-    <p class="text-sm">PO: {doc.purchaseOrderPublicId}</p>
-    <p class="text-sm">Supplier: {doc.supplier?.businessName}</p>
-    <p class="text-sm mb-3">Received: {doc.receivedAt ? new Date(doc.receivedAt).toLocaleString() : '—'}</p>
+    <div class="print-meta">
+      <p>PO: {doc.purchaseOrderPublicId}</p>
+      <p>Supplier: {doc.supplier?.businessName}</p>
+      <p>Received: {doc.receivedAt ? new Date(doc.receivedAt).toLocaleString() : '—'}</p>
+    </div>
 
-    <table class="w-full border-collapse text-sm">
+    <table class="text-sm">
       <thead>
-        <tr class="border-b text-left">
+        <tr class="border-b border-slate-400 text-left">
           <th class="py-1">Line</th>
           <th class="py-1">Accepted</th>
           <th class="py-1">Rejected</th>
@@ -70,28 +88,3 @@
     <p class="mt-3 font-semibold">Accepted value: {doc.totalAcceptedValue}</p>
   </article>
 {/if}
-
-<style>
-  @media print {
-    :global(.no-print) {
-      display: none !important;
-    }
-  }
-  .print-a4 {
-    max-width: 210mm;
-    margin: 0 auto;
-    padding: 12mm;
-  }
-  .print-receipt {
-    max-width: 80mm;
-    margin: 0 auto;
-    padding: 8px;
-    font-size: 12px;
-  }
-  .print-58 {
-    max-width: 58mm;
-    margin: 0 auto;
-    padding: 6px;
-    font-size: 11px;
-  }
-</style>

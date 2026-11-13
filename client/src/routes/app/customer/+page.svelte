@@ -19,13 +19,17 @@
   let appointments = $state<any[]>([]);
   let categories = $state<{ id: string; label: string; shopCount: number }[]>([]);
   let recentShops = $state<any[]>([]);
+  let receipts = $state<any[]>([]);
+  let notifications = $state<any[]>([]);
+
+  const receiptTypes = new Set(['invoice', 'payment_receipt', 'intake_receipt', 'handover', 'warranty']);
 
   async function load() {
     loading = true;
     error = '';
     try {
       const recentIds = getRecentShopIds();
-      const [list, appts, cats, recent] = await Promise.all([
+      const [list, appts, cats, recent, docs, notifPayload] = await Promise.all([
         api<{ data: any[] }>('/api/v1/repairs?limit=12', { full: true }),
         api<any[]>('/api/v1/appointments').catch(() => []),
         api<{ id: string; label: string; shopCount: number }[]>('/api/v1/shops/categories').catch(() => []),
@@ -33,7 +37,9 @@
           ? api<{ data: any[] }>(`/api/v1/shops?ids=${encodeURIComponent(recentIds.join(','))}&limit=6`, {
               full: true
             }).catch(() => ({ data: [] }))
-          : Promise.resolve({ data: [] })
+          : Promise.resolve({ data: [] }),
+        api<any[]>('/api/v1/documents').catch(() => []),
+        api<{ items: any[]; unread: number }>('/api/v1/notifications').catch(() => ({ items: [], unread: 0 }))
       ]);
       repairs = list.data || [];
       appointments = (appts || [])
@@ -42,6 +48,8 @@
       categories = cats?.length ? cats : SERVICE_CATEGORIES.map((c) => ({ ...c, shopCount: 0 }));
       const byId = new Map((recent.data || []).map((s: any) => [String(s._id), s]));
       recentShops = recentIds.map((id) => byId.get(id)).filter(Boolean);
+      receipts = (docs || []).filter((d) => receiptTypes.has(d.docType)).slice(0, 5);
+      notifications = (notifPayload.items || []).slice(0, 5);
     } catch (err: any) {
       error = err?.message || $t('errorGeneric');
     } finally {
@@ -202,6 +210,56 @@
               <span class="min-w-0">
                 <span class="block font-medium text-ink">{new Date(appt.startsAt).toLocaleString()}</span>
                 <span class="block text-xs text-muted">{appt.shop?.name || ''}</span>
+              </span>
+            </li>
+          {:else}
+            <li class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-6 text-center text-muted" role="status">
+              {$t('empty')}
+            </li>
+          {/each}
+        </ul>
+      </section>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <section class="surface-card flex flex-col p-4" aria-labelledby="recent-receipts-heading">
+        <div class="mb-3 flex items-center justify-between gap-2">
+          <h2 id="recent-receipts-heading" class="text-sm font-semibold text-ink">{$t('myReceipts')}</h2>
+          <a class="text-xs font-medium hover:underline" href="/app/customer/receipts">{$t('viewAll')}</a>
+        </div>
+        <ul class="flex-1 space-y-2 text-sm" role="list">
+          {#each receipts as doc}
+            <li class="flex items-start gap-2 rounded-[var(--radius-ui)] border border-border px-2.5 py-2">
+              <Icon name="fileText" size={15} class="mt-0.5 shrink-0 text-accent" />
+              <a class="min-w-0 font-medium hover:underline" href={`/app/documents/${doc._id || doc.id}`}>
+                <span class="block truncate">{doc.title || doc.docType?.replaceAll('_', ' ') || $t('documents')}</span>
+                <span class="block text-xs font-normal text-muted">
+                  {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : ''}
+                </span>
+              </a>
+            </li>
+          {:else}
+            <li class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-6 text-center text-muted" role="status">
+              {$t('empty')}
+            </li>
+          {/each}
+        </ul>
+      </section>
+
+      <section class="surface-card flex flex-col p-4" aria-labelledby="recent-comms-heading">
+        <div class="mb-3 flex items-center justify-between gap-2">
+          <h2 id="recent-comms-heading" class="text-sm font-semibold text-ink">{$t('notifications')}</h2>
+          <a class="text-xs font-medium hover:underline" href="/app/notifications">{$t('viewAll')}</a>
+        </div>
+        <ul class="flex-1 space-y-2 text-sm" role="list">
+          {#each notifications as n}
+            <li class="flex items-start gap-2 rounded-[var(--radius-ui)] border border-border px-2.5 py-2">
+              <Icon name="bell" size={15} class="mt-0.5 shrink-0 text-accent" />
+              <span class="min-w-0">
+                <span class="block font-medium text-ink">{n.title || n.message || n.body || $t('notifications')}</span>
+                <span class="block text-xs text-muted">
+                  {n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}
+                </span>
               </span>
             </li>
           {:else}

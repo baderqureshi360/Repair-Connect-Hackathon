@@ -15,9 +15,9 @@
   import Alert from './Alert.svelte';
   import ToastHost from './ToastHost.svelte';
   import Icon from './Icon.svelte';
+  import BrandMark from './BrandMark.svelte';
   import CommandPalette from './CommandPalette.svelte';
   import ShortcutsHelp from './ShortcutsHelp.svelte';
-
   let {
     children,
     pendingOnboarding = false
@@ -46,6 +46,10 @@
       ? pendingNavByRole.supplier || []
       : pendingNavByRole.shop_admin || []
   );
+  const shellNav = $derived(
+    $user ? (pendingOnboarding ? pendingNav : navByRole[$user.role] || []) : []
+  );
+  const brandHref = $derived(shellNav[0]?.href || '/');
 
   async function refreshUnread() {
     try {
@@ -376,29 +380,33 @@
   ></button>
 {/if}
 
-<div class="min-h-screen lg:flex">
+<div class="min-h-dvh lg:flex">
   <aside
     id="primary-nav"
-    class={`sidebar-panel sidebar-dark inset-y-0 start-0 z-50 w-64 flex-col lg:static lg:z-auto lg:flex ${
-      collapsed ? 'lg:w-[4.75rem]' : 'lg:w-64'
+    class={`sidebar-panel sidebar-dark inset-y-0 start-0 z-50 w-60 flex-col lg:sticky lg:top-0 lg:z-auto lg:flex lg:h-dvh lg:shrink-0 ${
+      collapsed ? 'lg:w-[4.5rem]' : 'lg:w-60'
     } ${mobileOpen ? 'fixed flex translate-x-0' : 'fixed hidden'}`}
     aria-label="Primary"
   >
-    <div class="flex items-center justify-between gap-2 border-b border-[color:var(--color-sidebar-border)] px-3 py-3.5">
-      <div class={`flex min-w-0 items-center gap-2.5 ${collapsed ? 'lg:justify-center lg:w-full' : ''}`}>
+    <div class="flex items-center justify-between gap-2 border-b border-[color:var(--color-sidebar-border)] px-3 py-3">
+      <a
+        href={brandHref}
+        class={`flex min-w-0 items-center gap-2.5 text-[color:var(--color-sidebar-text-active)] ${collapsed ? 'lg:justify-center lg:w-full' : ''}`}
+        aria-label={$t('appName')}
+      >
         <span class="sidebar-logo" aria-hidden="true">
-          <Icon name="wrench" size={16} />
+          <BrandMark size={28} compact />
         </span>
         {#if !collapsed}
           <div class="min-w-0">
-            <p class="truncate text-sm font-bold tracking-tight text-[color:var(--color-sidebar-text-active)]">
+            <p class="truncate text-sm font-bold tracking-tight">
               {$t('appName')}
             </p>
           </div>
         {:else}
-          <p class="hidden text-xs font-bold text-[color:var(--color-sidebar-text-active)] lg:sr-only">RC</p>
+          <p class="hidden text-xs font-bold lg:sr-only">RC</p>
         {/if}
-      </div>
+      </a>
       <button
         type="button"
         class="sidebar-icon-btn hidden lg:inline-flex"
@@ -419,29 +427,37 @@
       </button>
     </div>
 
-    <nav class="flex-1 space-y-0.5 overflow-y-auto p-2" aria-label="Main">
-      {#if $user}
-        {#each pendingOnboarding ? pendingNav : navByRole[$user.role] as item}
-          <a
-            href={item.href}
-            class="nav-link-dark"
-            class:justify-center={collapsed}
-            aria-current={isActive(item.href) ? 'page' : undefined}
-            title={collapsed ? $t(item.key) : undefined}
-          >
-            <Icon name={item.icon} size={18} class="shrink-0 opacity-90" />
-            <span class={collapsed ? 'lg:sr-only' : ''}>{$t(item.key)}</span>
-            {#if item.key === 'notifications' && unread > 0}
-              <span
-                class={`nav-badge ms-auto ${collapsed ? 'lg:absolute lg:end-1 lg:top-1' : ''}`}
-                aria-label={`${unread} unread`}
-              >
-                {unread > 99 ? '99+' : unread}
-              </span>
-            {/if}
-          </a>
-        {/each}
-      {/if}
+    <nav class="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain p-2" aria-label="Main">
+      {#each shellNav as item, i}
+        {#if i > 0 && item.section && item.section !== shellNav[i - 1]?.section}
+          <div
+            class="my-1.5 border-t border-[color:var(--color-sidebar-border)]"
+            role="separator"
+            aria-hidden="true"
+          ></div>
+        {/if}
+        <a
+          href={item.href}
+          class="nav-link-dark"
+          class:justify-center={collapsed}
+          aria-current={isActive(item.href) ? 'page' : undefined}
+          title={collapsed ? $t(item.key) : undefined}
+          onclick={() => {
+            if (isNarrow) mobileOpen = false;
+          }}
+        >
+          <Icon name={item.icon} size={18} class="shrink-0 opacity-90" />
+          <span class={collapsed ? 'lg:sr-only' : ''}>{$t(item.key)}</span>
+          {#if item.key === 'notifications' && unread > 0}
+            <span
+              class={`nav-badge ms-auto ${collapsed ? 'lg:absolute lg:end-1 lg:top-1' : ''}`}
+              aria-label={`${unread} unread`}
+            >
+              {unread > 99 ? '99+' : unread}
+            </span>
+          {/if}
+        </a>
+      {/each}
     </nav>
 
     <div class="mt-auto border-t border-[color:var(--color-sidebar-border)] p-3">
@@ -488,7 +504,7 @@
   </aside>
 
   <div class="flex min-w-0 flex-1 flex-col overflow-x-clip">
-    <header class="sticky top-0 z-30 border-b border-border bg-surface-elevated/95 backdrop-blur">
+    <header class="sticky top-0 z-30 border-b border-border bg-surface-elevated/95 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/85">
       <div class="flex h-14 min-w-0 items-center gap-2 px-3 md:px-4">
         <button
           type="button"
@@ -502,7 +518,10 @@
           <Icon name="menu" size={18} />
         </button>
 
-        <p class="min-w-0 flex-1 truncate text-sm font-semibold text-ink lg:hidden">{$t('appName')}</p>
+        <div class="flex min-w-0 flex-1 items-center gap-2 lg:hidden">
+          <BrandMark size={22} compact class="shrink-0" />
+          <p class="min-w-0 truncate text-sm font-semibold text-ink">{$t('appName')}</p>
+        </div>
 
         <form class="relative hidden min-w-0 flex-1 md:block md:max-w-xl" onsubmit={submitSearch}>
           <label class="sr-only" for="global-search">{$t('globalSearch')}</label>
@@ -713,7 +732,7 @@
 
     <div class="sr-only" aria-live="polite">{$announce}</div>
 
-    <main id="main" class="min-w-0 flex-1 overflow-x-clip p-4 md:p-6">
+    <main id="main" class="min-w-0 flex-1 overflow-x-clip px-4 py-5 md:px-6 md:py-6">
       {@render children()}
     </main>
   </div>

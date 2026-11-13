@@ -6,6 +6,7 @@
   import { setSession, type Role } from '$lib/stores/auth';
   import { lang, t } from '$lib/i18n';
   import Alert from '$lib/components/Alert.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
 
   let email = $state('');
   let password = $state('');
@@ -112,9 +113,14 @@
   <title>{portal === 'shop' ? $t('loginShopTitle') : $t('loginCustomerTitle')} — RepairConnect</title>
 </svelte:head>
 
-<main class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
-  <a href="/" class="mb-4 text-sm font-medium hover:underline">← {$t('home')}</a>
-  <h1 class="text-2xl font-bold text-ink">{portal === 'shop' ? $t('loginShopTitle') : $t('loginCustomerTitle')}</h1>
+<main class="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">
+  <a href="/" class="mb-6 inline-flex items-center gap-2.5 text-sm font-semibold text-ink hover:opacity-90">
+    <BrandMark size={36} compact />
+    <span>{$t('appName')}</span>
+  </a>
+  <h1 class="text-xl font-semibold tracking-tight text-ink md:text-2xl">
+    {portal === 'shop' ? $t('loginShopTitle') : $t('loginCustomerTitle')}
+  </h1>
   <p class="mt-1 text-sm text-muted">
     {portal === 'shop' ? $t('loginShopHint') : $t('loginCustomerHint')}
   </p>
@@ -149,7 +155,7 @@
     </a>
   </div>
 
-  <form class="mt-6 space-y-4" method="post" action="#" onsubmit={onSubmit} novalidate>
+  <form class="surface-card mt-6 space-y-4 p-5" method="post" action="#" onsubmit={onSubmit} novalidate>
     {#if error}
       <Alert type="error" role="alert" message={error} />
     {/if}

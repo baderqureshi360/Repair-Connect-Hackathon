@@ -6,6 +6,8 @@
   import { user } from '$lib/stores/auth';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
   import UnsavedChangesGuard from '$lib/components/UnsavedChangesGuard.svelte';
 
   type SupplierOption = {
@@ -181,70 +183,92 @@
   }
 </script>
 
-<section class="space-y-6">
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
   <UnsavedChangesGuard dirty={paymentDirty} />
-  <header>
-    <h1 class="text-2xl font-semibold">{$t('supplierFinance')}</h1>
-    <p class="text-sm text-muted">Supplier payables are separate from customer repair revenue.</p>
-  </header>
+  <PageHeader
+    title={$t('supplierFinance')}
+    subtitle="Supplier payables are separate from customer repair revenue."
+    breadcrumbs={[{ label: $t('home'), href: '/app/admin' }, { label: $t('supplierFinance') }]}
+  />
 
   {#if error}<Alert type="error" role="alert" message={error} />{/if}
   {#if okMsg}<Alert type="success" role="status" message={okMsg} />{/if}
 
   {#if loading}
-    <p class="text-muted">{$t('loading')}</p>
+    <div class="space-y-2" role="status" aria-busy="true" aria-label={$t('loading')}>
+      {#each Array.from({ length: 4 }) as _}<Skeleton class="h-16" />{/each}
+    </div>
   {:else if reports}
-    <section class="space-y-2">
-      <h2 class="text-lg font-semibold">Outstanding payables</h2>
-      {#if !reports.outstandingPayables?.length}
-        <p class="text-sm text-muted">No outstanding balances.</p>
-      {:else}
-        <ul class="space-y-1 text-sm">
-          {#each reports.outstandingPayables as row}
-            {@const match = supplierOptions.find((s) => s.id === row.supplierBusinessId)}
-            <li class="rounded border border-border px-3 py-2 flex justify-between gap-2">
-              <button type="button" class="text-left text-accent underline" onclick={() => selectById(row.supplierBusinessId)}>
-                {match?.businessName || row.supplierBusinessId}
-                {#if match?.city}<span class="text-muted"> · {match.city}</span>{/if}
-              </button>
-              <span>{row.outstandingPayable} {row.currency}</span>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
+    <div class="grid gap-4 lg:grid-cols-2">
+      <section class="surface-card flex flex-col p-4" aria-labelledby="payables-heading">
+        <h2 id="payables-heading" class="mb-3 text-sm font-semibold text-ink">Outstanding payables</h2>
+        {#if !reports.outstandingPayables?.length}
+          <p class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-6 text-center text-sm text-muted" role="status">
+            No outstanding balances.
+          </p>
+        {:else}
+          <ul class="space-y-2 text-sm" role="list">
+            {#each reports.outstandingPayables as row}
+              {@const match = supplierOptions.find((s) => s.id === row.supplierBusinessId)}
+              <li class="flex justify-between gap-2 rounded-[var(--radius-ui)] border border-border px-3 py-2.5">
+                <button
+                  type="button"
+                  class="text-start font-medium hover:underline"
+                  onclick={() => selectById(row.supplierBusinessId)}
+                >
+                  {match?.businessName || row.supplierBusinessId}
+                  {#if match?.city}<span class="block text-xs font-normal text-muted">{match.city}</span>{/if}
+                </button>
+                <span class="shrink-0 tabular-nums font-semibold">{row.outstandingPayable} {row.currency}</span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
 
-    <section class="space-y-2">
-      <h2 class="text-lg font-semibold">Pending purchase orders</h2>
-      <p class="text-sm">{reports.pendingPurchaseOrders?.length || 0} open</p>
-    </section>
+      <section class="surface-card p-4" aria-labelledby="pending-po-heading">
+        <h2 id="pending-po-heading" class="mb-1 text-sm font-semibold text-ink">Pending purchase orders</h2>
+        <p class="text-2xl font-semibold tabular-nums text-ink">{reports.pendingPurchaseOrders?.length || 0}</p>
+        <p class="mt-1 text-xs text-muted">Open supplier POs for this shop</p>
+        <Button class="mt-4" href="/app/admin/purchase-orders" variant="outline" size="sm">
+          {$t('purchaseOrders')}
+        </Button>
+      </section>
+    </div>
 
-    <section class="space-y-3 rounded-lg border border-border p-4">
-      <h2 class="font-semibold">{$t('recordPayment')}</h2>
+    <section class="surface-card space-y-3 p-4 md:p-5">
+      <h2 class="text-sm font-semibold text-ink">{$t('recordPayment')}</h2>
 
-      <label class="block text-sm" for="supplier-search">Supplier</label>
-      <input
-        id="supplier-search"
-        class="input-field"
-        type="search"
-        placeholder="Search by supplier name"
-        value={supplierQuery}
-        oninput={(e) => onQueryInput((e.currentTarget as HTMLInputElement).value)}
-        aria-controls="supplier-results"
-        autocomplete="off"
-      />
+      <div>
+        <label class="field-label" for="supplier-search">Supplier</label>
+        <input
+          id="supplier-search"
+          class="input-field"
+          type="search"
+          placeholder="Search by supplier name"
+          value={supplierQuery}
+          oninput={(e) => onQueryInput((e.currentTarget as HTMLInputElement).value)}
+          aria-controls="supplier-results"
+          autocomplete="off"
+        />
+      </div>
       {#if supplierSearchLoading}
         <p class="text-xs text-muted" aria-live="polite">{$t('loading')}</p>
       {/if}
-      <ul id="supplier-results" class="max-h-48 overflow-y-auto rounded border border-border" role="listbox" aria-label="Suppliers">
+      <ul
+        id="supplier-results"
+        class="max-h-48 overflow-y-auto rounded-[var(--radius-ui)] border border-border"
+        role="listbox"
+        aria-label="Suppliers"
+      >
         {#each supplierOptions as opt}
           <li>
             <button
               type="button"
               role="option"
               aria-selected={selectedSupplier?.id === opt.id}
-              class="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-surface-elevated {selectedSupplier?.id === opt.id
-                ? 'bg-surface-elevated'
+              class="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-surface-muted {selectedSupplier?.id === opt.id
+                ? 'bg-accent-soft'
                 : ''}"
               onclick={() => selectSupplier(opt)}
             >
@@ -258,7 +282,7 @@
       </ul>
 
       {#if selectedSupplier}
-        <div class="rounded border border-border bg-surface-elevated px-3 py-2 text-sm" aria-live="polite">
+        <div class="rounded-[var(--radius-ui)] border border-border bg-surface-muted px-3 py-2 text-sm" aria-live="polite">
           <p class="font-medium">{selectedSupplier.businessName}</p>
           <p class="text-muted">{selectedSupplier.city}{selectedSupplier.region ? `, ${selectedSupplier.region}` : ''}</p>
           {#if selectedSupplier.contactPerson}
@@ -273,41 +297,54 @@
         </div>
       {/if}
 
-      <label class="block text-sm" for="amt">Amount</label>
-      <input id="amt" class="input-field" type="number" min="0" step="0.01" bind:value={amount} />
-      <label class="block text-sm" for="method">Method</label>
-      <select id="method" class="input-field" bind:value={method}>
-        <option value="bank_transfer">Bank transfer</option>
-        <option value="cash">Cash</option>
-        <option value="cheque">Cheque</option>
-        <option value="jazzcash">JazzCash</option>
-        <option value="easypaisa">Easypaisa</option>
-        <option value="other">Other</option>
-      </select>
-      <label class="block text-sm" for="ref">Reference</label>
-      <input id="ref" class="input-field" bind:value={reference} />
+      <div class="grid gap-3 sm:grid-cols-3">
+        <div>
+          <label class="field-label" for="amt">Amount</label>
+          <input id="amt" class="input-field" type="number" min="0" step="0.01" bind:value={amount} />
+        </div>
+        <div>
+          <label class="field-label" for="method">Method</label>
+          <select id="method" class="input-field" bind:value={method}>
+            <option value="bank_transfer">Bank transfer</option>
+            <option value="cash">Cash</option>
+            <option value="cheque">Cheque</option>
+            <option value="jazzcash">JazzCash</option>
+            <option value="easypaisa">Easypaisa</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="ref">Reference</label>
+          <input id="ref" class="input-field" bind:value={reference} />
+        </div>
+      </div>
       <Button variant="primary" onclick={pay} disabled={!selectedSupplier || amount <= 0}>
         {$t('recordPayment')}
       </Button>
     </section>
 
-    <section class="space-y-2">
-      <h2 class="text-lg font-semibold">Ledger</h2>
-      <div class="overflow-x-auto rounded-lg border border-border">
-        <table class="min-w-full text-left text-sm">
-          <thead class="bg-surface-elevated text-muted">
+    <section class="space-y-3">
+      <h2 class="text-sm font-semibold text-ink">Ledger</h2>
+      <div class="data-table-shell">
+        <table class="min-w-full text-start text-sm">
+          <caption class="sr-only">Ledger</caption>
+          <thead class="border-b border-border text-muted">
             <tr>
-              <th class="px-3 py-2">Ref</th>
-              <th class="px-3 py-2">Kind</th>
-              <th class="px-3 py-2">Amount</th>
+              <th class="px-3 py-2" scope="col">Ref</th>
+              <th class="px-3 py-2" scope="col">Kind</th>
+              <th class="px-3 py-2" scope="col">Amount</th>
             </tr>
           </thead>
           <tbody>
             {#each entries as e}
               <tr class="border-t border-border">
-                <td class="px-3 py-2">{e.publicId}</td>
+                <td class="px-3 py-2 font-medium">{e.publicId}</td>
                 <td class="px-3 py-2">{e.kind}</td>
-                <td class="px-3 py-2">{e.amount} {e.currency}</td>
+                <td class="px-3 py-2 tabular-nums">{e.amount} {e.currency}</td>
+              </tr>
+            {:else}
+              <tr>
+                <td class="px-3 py-6 text-center text-muted" colspan="3">{$t('empty')}</td>
               </tr>
             {/each}
           </tbody>

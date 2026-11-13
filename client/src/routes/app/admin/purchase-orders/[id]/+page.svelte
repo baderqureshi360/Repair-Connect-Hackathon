@@ -7,6 +7,9 @@
   import { user } from '$lib/stores/auth';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
+  import StatusPill from '$lib/components/StatusPill.svelte';
 
   let po = $state<any>(null);
   let shipments = $state<any[]>([]);
@@ -104,49 +107,54 @@
   }
 </script>
 
-<section class="space-y-4">
-  <button type="button" class="text-sm text-accent underline" onclick={() => goto('/app/admin/purchase-orders')}>
-    ← {$t('purchaseOrders')}
-  </button>
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
   {#if error}<Alert type="error" role="alert" message={error} />{/if}
   {#if okMsg}<Alert type="success" role="status" message={okMsg} />{/if}
 
   {#if loading}
-    <p class="text-muted">{$t('loading')}</p>
+    <div class="space-y-2" role="status" aria-busy="true" aria-label={$t('loading')}>
+      {#each Array.from({ length: 4 }) as _}<Skeleton class="h-12" />{/each}
+    </div>
   {:else if po}
-    <header class="flex flex-wrap items-start justify-between gap-2">
-      <div>
-        <h1 class="text-2xl font-semibold">{po.publicId}</h1>
-        <p class="text-sm text-muted capitalize">{String(po.status).replaceAll('_', ' ')} · Rev {po.revision}</p>
-        <p class="text-sm">{po.grandTotal} {po.currency}</p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <Button variant="outline" href={`/app/admin/purchase-orders/${po.publicId}/print`}>{$t('printPo')}</Button>
-        {#if canManage && po.status === 'draft'}
-          <Button variant="primary" onclick={issue}>{$t('issuePurchaseOrder')}</Button>
-        {/if}
-        {#if canReceive && ['issued', 'acknowledged', 'partially_fulfilled'].includes(po.status)}
-          <Button variant="primary" disabled={receiving} onclick={receiveAllAccepted}>
-            {receiving ? $t('loading') : $t('receiveGoods')}
-          </Button>
-        {/if}
-        {#if canManage && !['cancelled', 'closed', 'fulfilled', 'partially_fulfilled'].includes(po.status)}
-          <Button variant="outline" onclick={cancelPo}>Cancel</Button>
-        {/if}
-      </div>
-    </header>
+    <PageHeader
+      title={po.publicId}
+      subtitle={`${po.grandTotal} ${po.currency} · Rev ${po.revision}`}
+      breadcrumbs={[
+        { label: $t('home'), href: '/app/admin' },
+        { label: $t('purchaseOrders'), href: '/app/admin/purchase-orders' },
+        { label: po.publicId }
+      ]}
+    >
+      <StatusPill status={po.status} />
+      <Button variant="outline" size="sm" href={`/app/admin/purchase-orders/${po.publicId}/print`}>{$t('printPo')}</Button>
+      {#if canManage && po.status === 'draft'}
+        <Button variant="primary" size="sm" onclick={issue}>{$t('issuePurchaseOrder')}</Button>
+      {/if}
+      {#if canReceive && ['issued', 'acknowledged', 'partially_fulfilled'].includes(po.status)}
+        <Button variant="primary" size="sm" disabled={receiving} onclick={receiveAllAccepted}>
+          {receiving ? $t('loading') : $t('receiveGoods')}
+        </Button>
+      {/if}
+      {#if canManage && !['cancelled', 'closed', 'fulfilled', 'partially_fulfilled'].includes(po.status)}
+        <Button variant="outline" size="sm" onclick={cancelPo}>{$t('cancel')}</Button>
+      {/if}
+    </PageHeader>
 
-    <p class="text-sm whitespace-pre-wrap">{po.deliveryAddress || '—'}</p>
+    <p class="surface-card p-4 text-sm whitespace-pre-wrap text-muted">
+      <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink">Deliver to</span>
+      {po.deliveryAddress || '—'}
+    </p>
 
-    <div class="overflow-x-auto rounded-lg border border-border">
-      <table class="min-w-full text-left text-sm">
-        <thead class="bg-surface-elevated text-muted">
+    <div class="data-table-shell">
+      <table class="min-w-full text-start text-sm">
+        <caption class="sr-only">PO lines</caption>
+        <thead class="border-b border-border text-muted">
           <tr>
-            <th class="px-3 py-2">Item</th>
-            <th class="px-3 py-2">Ordered</th>
-            <th class="px-3 py-2">Received</th>
-            <th class="px-3 py-2">Unit</th>
-            <th class="px-3 py-2">Line</th>
+            <th class="px-3 py-2" scope="col">Item</th>
+            <th class="px-3 py-2" scope="col">Ordered</th>
+            <th class="px-3 py-2" scope="col">Received</th>
+            <th class="px-3 py-2" scope="col">Unit</th>
+            <th class="px-3 py-2" scope="col">Line</th>
           </tr>
         </thead>
         <tbody>
@@ -156,25 +164,28 @@
                 {line.name}
                 {#if line.isAlternative}<span class="text-xs text-muted"> (alt)</span>{/if}
               </td>
-              <td class="px-3 py-2">{line.quantityOrdered}</td>
-              <td class="px-3 py-2">{line.quantityReceivedAccepted || 0}</td>
-              <td class="px-3 py-2">{line.unitPrice}</td>
-              <td class="px-3 py-2">{line.lineSubtotal}</td>
+              <td class="px-3 py-2 tabular-nums">{line.quantityOrdered}</td>
+              <td class="px-3 py-2 tabular-nums">{line.quantityReceivedAccepted || 0}</td>
+              <td class="px-3 py-2 tabular-nums">{line.unitPrice}</td>
+              <td class="px-3 py-2 tabular-nums">{line.lineSubtotal}</td>
             </tr>
           {/each}
         </tbody>
       </table>
     </div>
 
-    <section class="space-y-2">
-      <h2 class="text-lg font-semibold">Shipments</h2>
+    <section class="surface-card space-y-2 p-4">
+      <h2 class="text-sm font-semibold text-ink">Shipments</h2>
       {#if !shipments.length}
-        <p class="text-sm text-muted">No shipments yet.</p>
+        <p class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-6 text-center text-sm text-muted" role="status">
+          No shipments yet.
+        </p>
       {:else}
-        <ul class="space-y-1 text-sm">
+        <ul class="space-y-2 text-sm" role="list">
           {#each shipments as s}
-            <li class="rounded border border-border px-3 py-2">
-              {s.publicId} · {s.status} · {s.carrier || '—'} {s.trackingNumber || ''}
+            <li class="rounded-[var(--radius-ui)] border border-border px-3 py-2.5">
+              <span class="font-medium">{s.publicId}</span>
+              <span class="text-muted"> · {s.status} · {s.carrier || '—'} {s.trackingNumber || ''}</span>
             </li>
           {/each}
         </ul>
@@ -182,16 +193,18 @@
     </section>
 
     {#if canReceive}
-      <section class="space-y-2">
-        <h2 class="text-lg font-semibold">Goods receipts</h2>
+      <section class="surface-card space-y-2 p-4">
+        <h2 class="text-sm font-semibold text-ink">Goods receipts</h2>
         {#if !receipts.length}
-          <p class="text-sm text-muted">No GRNs posted.</p>
+          <p class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-6 text-center text-sm text-muted" role="status">
+            No GRNs posted.
+          </p>
         {:else}
-          <ul class="space-y-1 text-sm">
+          <ul class="space-y-2 text-sm" role="list">
             {#each receipts as g}
-              <li class="rounded border border-border px-3 py-2 flex justify-between gap-2">
+              <li class="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-ui)] border border-border px-3 py-2.5">
                 <span>{g.publicId} · accepted value {g.totalAcceptedValue}</span>
-                <a class="text-accent underline" href={`/app/admin/goods-receipts/${g.publicId}/print`}>{$t('printGrn')}</a>
+                <a class="font-medium hover:underline" href={`/app/admin/goods-receipts/${g.publicId}/print`}>{$t('printGrn')}</a>
               </li>
             {/each}
           </ul>

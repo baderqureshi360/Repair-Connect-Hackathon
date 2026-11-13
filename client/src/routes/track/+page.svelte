@@ -3,6 +3,7 @@
   import Alert from '$lib/components/Alert.svelte';
   import Skeleton from '$lib/components/Skeleton.svelte';
   import TrackingResults from '$lib/components/TrackingResults.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
 
   let referenceNumber = $state('');
   let accessCode = $state('');
@@ -39,10 +40,12 @@
   <title>{$t('trackRepair')} — RepairConnect</title>
 </svelte:head>
 
-<main class="mx-auto min-h-screen max-w-2xl px-4 py-10">
-  <a href="/" class="text-sm text-accent hover:underline">← {$t('home')}</a>
-  <p class="mt-4 text-sm font-semibold text-accent">{$t('appName')}</p>
-  <h1 class="mt-1 text-2xl font-semibold">{$t('trackRepairTitle')}</h1>
+<main class="mx-auto min-h-dvh max-w-2xl px-4 py-10">
+  <a href="/" class="inline-flex items-center gap-2.5 text-sm font-semibold text-ink hover:opacity-90">
+    <BrandMark size={32} compact />
+    <span>{$t('appName')}</span>
+  </a>
+  <h1 class="mt-6 text-xl font-semibold tracking-tight md:text-2xl">{$t('trackRepairTitle')}</h1>
   <p class="mt-2 text-sm text-muted">{$t('trackRepairHelp')}</p>
 
   <form class="mt-6 space-y-4 surface-card p-4" onsubmit={onSubmit} novalidate>
@@ -50,26 +53,26 @@
       <Alert type="error" role="alert" message={error} />
     {/if}
     <div>
-      <label class="mb-1 block text-sm font-medium" for="reference">{$t('referenceNumber')}</label>
+      <label class="field-label" for="reference">{$t('referenceNumber')}</label>
       <input
         id="reference"
         name="reference"
         required
         autocomplete="off"
-        class="w-full rounded-md border border-border bg-surface-elevated px-3 py-2"
+        class="input-field"
         bind:value={referenceNumber}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby="track-help"
       />
     </div>
     <div>
-      <label class="mb-1 block text-sm font-medium" for="accessCode">{$t('trackingAccessCode')}</label>
+      <label class="field-label" for="accessCode">{$t('trackingAccessCode')}</label>
       <input
         id="accessCode"
         name="accessCode"
         required
         autocomplete="off"
-        class="w-full rounded-md border border-border bg-surface-elevated px-3 py-2 font-mono tracking-wider"
+        class="input-field font-mono tracking-wider"
         bind:value={accessCode}
         aria-invalid={error ? 'true' : undefined}
       />

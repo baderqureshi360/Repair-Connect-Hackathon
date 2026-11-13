@@ -8,6 +8,8 @@
   import { PART_CATEGORIES, partCategoryLabel } from '$lib/partCategories';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
   import DateRangeFilter, { type RangeKey } from '$lib/components/DateRangeFilter.svelte';
   import AnalyticsChart from '$lib/components/AnalyticsChart.svelte';
   import StatGrid from '$lib/components/StatGrid.svelte';
@@ -196,19 +198,19 @@
   }
 </script>
 
-<section class="space-y-6 print:space-y-3">
-  <header class="flex flex-wrap items-start justify-between gap-3 no-print">
-    <div>
-      <h1 class="text-2xl font-semibold">{$t('purchasingAnalytics')}</h1>
-      <p class="mt-1 text-sm text-muted">{$t('purchasingAnalyticsHint')}</p>
-    </div>
-    <div class="flex flex-wrap gap-2">
-      <Button variant="outline" onclick={printReport}>{$t('printReport')}</Button>
-      <Button variant="outline" href="/app/admin/supplier-finance">{$t('supplierFinance')}</Button>
-    </div>
-  </header>
+<section class="min-w-0 space-y-5 overflow-x-clip print:space-y-3 md:space-y-6">
+  <div class="no-print">
+    <PageHeader
+      title={$t('purchasingAnalytics')}
+      subtitle={$t('purchasingAnalyticsHint')}
+      breadcrumbs={[{ label: $t('home'), href: '/app/admin' }, { label: $t('purchasingAnalytics') }]}
+    >
+      <Button variant="outline" size="sm" onclick={printReport}>{$t('printReport')}</Button>
+      <Button variant="outline" size="sm" href="/app/admin/supplier-finance">{$t('supplierFinance')}</Button>
+    </PageHeader>
+  </div>
 
-  <div class="flex flex-wrap items-end gap-3 rounded-lg border border-border p-3 no-print">
+  <div class="surface-card no-print flex flex-wrap items-end gap-3 p-3 md:p-4">
     <DateRangeFilter bind:value={range} bind:from bind:to onchange={load} />
     <label class="text-sm" for="pa-supplier"
       >{$t('supplier')}
@@ -255,7 +257,9 @@
 
   {#if exportMsg}<Alert type="success" role="status" message={exportMsg} />{/if}
   {#if loading}
-    <p class="text-muted">{$t('loading')}</p>
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="status" aria-busy="true" aria-label={$t('loading')}>
+      {#each Array.from({ length: 4 }) as _}<Skeleton class="h-28" />{/each}
+    </div>
   {:else if error}
     <Alert type="error" role="alert" message={error} />
     <Button variant="outline" onclick={load}>{$t('retry')}</Button>
@@ -263,29 +267,33 @@
     <StatGrid stats={kpiStats()} />
 
     <div class="grid gap-4 lg:grid-cols-2">
-      <AnalyticsChart
-        title={$t('monthlyPurchasingTrends')}
-        type="line"
-        points={(data.monthlyPurchasingTrends || []).map((p: any) => ({
-          label: p.month,
-          value: p.value
-        }))}
-        empty={$t('noAnalyticsData')}
-      />
-      <AnalyticsChart
-        title={$t('supplierPurchasingComparison')}
-        type="bar"
-        points={(data.supplierComparison || []).slice(0, 8).map((s: any) => ({
-          label: s.businessName,
-          value: s.purchasingValue
-        }))}
-        empty={$t('noAnalyticsData')}
-      />
+      <div class="surface-card p-4">
+        <AnalyticsChart
+          title={$t('monthlyPurchasingTrends')}
+          type="line"
+          points={(data.monthlyPurchasingTrends || []).map((p: any) => ({
+            label: p.month,
+            value: p.value
+          }))}
+          empty={$t('noAnalyticsData')}
+        />
+      </div>
+      <div class="surface-card p-4">
+        <AnalyticsChart
+          title={$t('supplierPurchasingComparison')}
+          type="bar"
+          points={(data.supplierComparison || []).slice(0, 8).map((s: any) => ({
+            label: s.businessName,
+            value: s.purchasingValue
+          }))}
+          empty={$t('noAnalyticsData')}
+        />
+      </div>
     </div>
 
     <div class="grid gap-4 lg:grid-cols-2">
-      <section class="rounded-lg border border-border p-4 space-y-2">
-        <h2 class="font-semibold">{$t('orderedVersusReceived')}</h2>
+      <section class="surface-card space-y-2 p-4">
+        <h2 class="text-sm font-semibold text-ink">{$t('orderedVersusReceived')}</h2>
         <p class="text-sm">
           Ordered qty: {data.orderedVersusReceived?.orderedQuantity ?? 0} · Received qty:
           {data.orderedVersusReceived?.receivedQuantity ?? 0}
@@ -301,8 +309,8 @@
           {data.expenditureBreakdown?.outstandingPayables}
         </p>
       </section>
-      <section class="rounded-lg border border-border p-4 space-y-2">
-        <h2 class="font-semibold">{$t('downloadReports')}</h2>
+      <section class="surface-card space-y-2 p-4">
+        <h2 class="text-sm font-semibold text-ink">{$t('downloadReports')}</h2>
         <div class="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onclick={() => downloadReport('supplier_purchasing')}
             >Supplier purchasing</Button
@@ -328,65 +336,69 @@
       </section>
     </div>
 
-    <section class="space-y-2 overflow-x-auto">
-      <h2 class="font-semibold">{$t('topPurchasedProducts')}</h2>
+    <section class="space-y-2">
+      <h2 class="text-sm font-semibold text-ink">{$t('topPurchasedProducts')}</h2>
       {#if !(data.topPurchasedProducts || []).length}
         <p class="text-sm text-muted">{$t('noAnalyticsData')}</p>
       {:else}
-        <table class="min-w-full text-left text-sm">
-          <thead class="text-muted">
+        <div class="data-table-shell">
+        <table class="min-w-full text-start text-sm">
+          <thead class="border-b border-border text-muted">
             <tr>
-              <th class="px-2 py-1">Name</th>
-              <th class="px-2 py-1">SKU</th>
-              <th class="px-2 py-1">Ordered</th>
-              <th class="px-2 py-1">Received</th>
-              <th class="px-2 py-1">Value</th>
+              <th class="px-3 py-2" scope="col">Name</th>
+              <th class="px-3 py-2" scope="col">SKU</th>
+              <th class="px-3 py-2" scope="col">Ordered</th>
+              <th class="px-3 py-2" scope="col">Received</th>
+              <th class="px-3 py-2" scope="col">Value</th>
             </tr>
           </thead>
           <tbody>
             {#each data.topPurchasedProducts as p}
               <tr class="border-t border-border">
-                <td class="px-2 py-1">{p.name}</td>
-                <td class="px-2 py-1">{p.sku || '—'}</td>
-                <td class="px-2 py-1">{p.orderedQty}</td>
-                <td class="px-2 py-1">{p.receivedQty}</td>
-                <td class="px-2 py-1">{p.orderedValue}</td>
+                <td class="px-3 py-2">{p.name}</td>
+                <td class="px-3 py-2">{p.sku || '—'}</td>
+                <td class="px-3 py-2 tabular-nums">{p.orderedQty}</td>
+                <td class="px-3 py-2 tabular-nums">{p.receivedQty}</td>
+                <td class="px-3 py-2 tabular-nums">{p.orderedValue}</td>
               </tr>
             {/each}
           </tbody>
         </table>
+        </div>
       {/if}
     </section>
 
-    <section class="space-y-2 overflow-x-auto">
-      <h2 class="font-semibold">{$t('supplierPerformanceComparison')}</h2>
+    <section class="space-y-2">
+      <h2 class="text-sm font-semibold text-ink">{$t('supplierPerformanceComparison')}</h2>
       {#if !(data.supplierPerformanceComparison || []).length}
         <p class="text-sm text-muted">{$t('noAnalyticsData')}</p>
       {:else}
-        <table class="min-w-full text-left text-sm">
-          <thead class="text-muted">
+        <div class="data-table-shell">
+        <table class="min-w-full text-start text-sm">
+          <thead class="border-b border-border text-muted">
             <tr>
-              <th class="px-2 py-1">Supplier</th>
-              <th class="px-2 py-1">Verified</th>
-              <th class="px-2 py-1">Fulfilment</th>
-              <th class="px-2 py-1">On-time</th>
-              <th class="px-2 py-1">Reviews</th>
-              <th class="px-2 py-1">Overdue</th>
+              <th class="px-3 py-2" scope="col">Supplier</th>
+              <th class="px-3 py-2" scope="col">Verified</th>
+              <th class="px-3 py-2" scope="col">Fulfilment</th>
+              <th class="px-3 py-2" scope="col">On-time</th>
+              <th class="px-3 py-2" scope="col">Reviews</th>
+              <th class="px-3 py-2" scope="col">Overdue</th>
             </tr>
           </thead>
           <tbody>
             {#each data.supplierPerformanceComparison as s}
               <tr class="border-t border-border">
-                <td class="px-2 py-1">{s.businessName}</td>
-                <td class="px-2 py-1">{s.verified ? $t('verified') : '—'}</td>
-                <td class="px-2 py-1">{s.fulfilmentRate?.label} (n={s.fulfilmentRate?.sampleCount})</td>
-                <td class="px-2 py-1">{s.onTimeDelivery?.label} (n={s.onTimeDelivery?.sampleCount})</td>
-                <td class="px-2 py-1">{s.verifiedReviews?.label}</td>
-                <td class="px-2 py-1">{s.pendingOverdue?.count ?? 0}</td>
+                <td class="px-3 py-2 font-medium">{s.businessName}</td>
+                <td class="px-3 py-2">{s.verified ? $t('verified') : '—'}</td>
+                <td class="px-3 py-2">{s.fulfilmentRate?.label} (n={s.fulfilmentRate?.sampleCount})</td>
+                <td class="px-3 py-2">{s.onTimeDelivery?.label} (n={s.onTimeDelivery?.sampleCount})</td>
+                <td class="px-3 py-2">{s.verifiedReviews?.label}</td>
+                <td class="px-3 py-2 tabular-nums">{s.pendingOverdue?.count ?? 0}</td>
               </tr>
             {/each}
           </tbody>
         </table>
+        </div>
       {/if}
     </section>
 

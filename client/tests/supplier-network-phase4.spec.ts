@@ -224,7 +224,7 @@ test.describe('Supplier Network Phase 4 E2E', () => {
       await seedPageSession(parts.page, parts.request, partsSession.user);
       await openRoleHome(parts.page, 'parts_coordinator');
       await parts.page.goto(`/app/admin/purchase-orders/${poPublicId}`);
-      await expect(parts.page.getByText(poPublicId)).toBeVisible({ timeout: 15000 });
+      await expect(parts.page.getByRole('heading', { name: poPublicId })).toBeVisible({ timeout: 15000 });
       await parts.page.getByRole('button', { name: /receive goods|سامان وصول/i }).click();
       await expect(parts.page.getByText(/GRN .+ posted/i)).toBeVisible({ timeout: 20000 });
       const grnLink = parts.page.locator('a', { hasText: /print grn|GRN پرنٹ/i }).first();

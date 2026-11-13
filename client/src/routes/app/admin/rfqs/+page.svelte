@@ -6,6 +6,9 @@
   import { selectedShopId } from '$lib/stores/shopContext';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
+  import StatusPill from '$lib/components/StatusPill.svelte';
 
   let rfqs = $state<any[]>([]);
   let suppliers = $state<any[]>([]);
@@ -30,10 +33,6 @@
     try {
       const shopId = $selectedShopId || '';
       rfqs = (await api(`/api/v1/supplier-network/rfqs?shopId=${shopId}`)) || [];
-      const market = await api<{ items: any[] }>(
-        `/api/v1/marketplace/suppliers?city=&limit=100`.replace('city=&', '')
-      ).catch(() => ({ items: [] }));
-      // Prefer marketplace list with shop default city
       const meta = await api<{ defaultCity?: string }>('/api/v1/marketplace/suppliers/meta').catch(() => ({}));
       const city = (meta as any).defaultCity || '';
       const list = await api<{ items: any[] }>(
@@ -86,30 +85,44 @@
   onMount(load);
 </script>
 
-<section class="space-y-4">
-  <header class="flex flex-wrap items-center justify-between gap-2">
-    <div>
-      <h1 class="text-2xl font-semibold">{$t('rfqs')}</h1>
-      <p class="text-sm text-muted">Request quotations from approved suppliers</p>
-    </div>
-    <Button variant="primary" onclick={() => (showCreate = !showCreate)}>New RFQ</Button>
-  </header>
+<section class="min-w-0 space-y-5 overflow-x-clip md:space-y-6">
+  <PageHeader
+    title={$t('rfqs')}
+    subtitle="Request quotations from approved suppliers"
+    breadcrumbs={[{ label: $t('home'), href: '/app/admin' }, { label: $t('rfqs') }]}
+  >
+    <Button variant="primary" size="sm" onclick={() => (showCreate = !showCreate)}>
+      {showCreate ? $t('cancel') : $t('requestQuote')}
+    </Button>
+  </PageHeader>
 
   {#if error}<Alert type="error" role="alert" message={error} />{/if}
 
   {#if showCreate}
-    <form class="space-y-3 rounded-lg border border-border p-4" onsubmit={createRfq}>
-      <label class="block text-sm">Title<input class="input-field mt-1 w-full" required bind:value={form.title} /></label>
-      <label class="block text-sm">Requirements<textarea class="input-field mt-1 w-full" rows="2" bind:value={form.additionalRequirements}></textarea></label>
+    <form class="surface-card space-y-4 p-4 md:p-5" onsubmit={createRfq}>
+      <div>
+        <label class="field-label" for="rfq-title">Title</label>
+        <input id="rfq-title" class="input-field" required bind:value={form.title} />
+      </div>
+      <div>
+        <label class="field-label" for="rfq-req">Requirements</label>
+        <textarea id="rfq-req" class="input-field min-h-[4.5rem]" rows="2" bind:value={form.additionalRequirements}></textarea>
+      </div>
       <div class="grid gap-3 sm:grid-cols-2">
-        <label class="text-sm">Required delivery<input type="date" class="input-field mt-1 w-full" bind:value={form.requiredDeliveryDate} /></label>
-        <label class="text-sm">Expires<input type="date" class="input-field mt-1 w-full" bind:value={form.expiresAt} /></label>
+        <div>
+          <label class="field-label" for="rfq-delivery">Required delivery</label>
+          <input id="rfq-delivery" type="date" class="input-field" bind:value={form.requiredDeliveryDate} />
+        </div>
+        <div>
+          <label class="field-label" for="rfq-expires">Expires</label>
+          <input id="rfq-expires" type="date" class="input-field" bind:value={form.expiresAt} />
+        </div>
       </div>
       <fieldset>
-        <legend class="text-sm font-medium">Suppliers</legend>
+        <legend class="field-label">Suppliers</legend>
         <div class="mt-2 flex flex-wrap gap-2">
           {#each suppliers as s}
-            <label class="inline-flex items-center gap-2 rounded border border-border px-2 py-1 text-sm">
+            <label class="inline-flex items-center gap-2 rounded-[var(--radius-ui)] border border-border bg-surface px-2.5 py-1.5 text-sm">
               <input
                 type="checkbox"
                 checked={form.supplierBusinessIds.includes(s.id)}
@@ -121,39 +134,56 @@
         </div>
       </fieldset>
       <div class="grid gap-3 sm:grid-cols-3">
-        <label class="text-sm sm:col-span-2">Item name<input class="input-field mt-1 w-full" required bind:value={form.itemName} /></label>
-        <label class="text-sm">Qty<input type="number" min="1" class="input-field mt-1 w-full" bind:value={form.itemQty} /></label>
+        <div class="sm:col-span-2">
+          <label class="field-label" for="rfq-item">Item name</label>
+          <input id="rfq-item" class="input-field" required bind:value={form.itemName} />
+        </div>
+        <div>
+          <label class="field-label" for="rfq-qty">Qty</label>
+          <input id="rfq-qty" type="number" min="1" class="input-field" bind:value={form.itemQty} />
+        </div>
       </div>
-      <label class="block text-sm">Specifications<textarea class="input-field mt-1 w-full" rows="2" bind:value={form.itemSpecs}></textarea></label>
-      <label class="flex items-center gap-2 text-sm"><input type="checkbox" bind:checked={form.send} /> Send immediately</label>
+      <div>
+        <label class="field-label" for="rfq-specs">Specifications</label>
+        <textarea id="rfq-specs" class="input-field min-h-[4.5rem]" rows="2" bind:value={form.itemSpecs}></textarea>
+      </div>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" bind:checked={form.send} />
+        Send immediately
+      </label>
       <Button type="submit" variant="primary">{$t('requestQuote')}</Button>
     </form>
   {/if}
 
   {#if loading}
-    <p class="text-muted">{$t('loading')}</p>
+    <div class="space-y-2" role="status" aria-busy="true" aria-label={$t('loading')}>
+      {#each Array.from({ length: 4 }) as _}<Skeleton class="h-12" />{/each}
+    </div>
   {:else if !rfqs.length}
-    <p class="text-muted">{$t('noRfqs')}</p>
+    <p class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-8 text-center text-sm text-muted" role="status">
+      {$t('noRfqs')}
+    </p>
   {:else}
-    <div class="overflow-x-auto rounded-lg border border-border">
-      <table class="min-w-full text-left text-sm">
-        <thead class="bg-surface-elevated text-muted">
+    <div class="data-table-shell">
+      <table class="min-w-full text-start text-sm">
+        <caption class="sr-only">{$t('rfqs')}</caption>
+        <thead class="border-b border-border text-muted">
           <tr>
-            <th class="px-3 py-2">{$t('rfqReference')}</th>
-            <th class="px-3 py-2">Title</th>
-            <th class="px-3 py-2">Status</th>
-            <th class="px-3 py-2">Suppliers</th>
+            <th class="px-3 py-2" scope="col">{$t('rfqReference')}</th>
+            <th class="px-3 py-2" scope="col">Title</th>
+            <th class="px-3 py-2" scope="col">Status</th>
+            <th class="px-3 py-2" scope="col">Suppliers</th>
           </tr>
         </thead>
         <tbody>
           {#each rfqs as rfq}
             <tr class="border-t border-border">
               <td class="px-3 py-2">
-                <a class="text-accent underline" href={`/app/admin/rfqs/${rfq.publicId}`}>{rfq.publicId}</a>
+                <a class="font-medium hover:underline" href={`/app/admin/rfqs/${rfq.publicId}`}>{rfq.publicId}</a>
               </td>
               <td class="px-3 py-2">{rfq.title}</td>
-              <td class="px-3 py-2 capitalize">{rfq.status.replaceAll('_', ' ')}</td>
-              <td class="px-3 py-2">{(rfq.supplierBusinessIds || []).length}</td>
+              <td class="px-3 py-2"><StatusPill status={rfq.status} /></td>
+              <td class="px-3 py-2 tabular-nums">{(rfq.supplierBusinessIds || []).length}</td>
             </tr>
           {/each}
         </tbody>

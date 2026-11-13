@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
 export type Accent = 'indigo' | 'blue' | 'teal' | 'violet' | 'emerald';
@@ -18,8 +18,8 @@ export interface UserPreferences {
 
 export const defaultPreferences: UserPreferences = {
   theme: 'system',
-  /* emerald maps to Porto green in accentVars — keeps DB enum unchanged */
-  accent: 'emerald',
+  /* Product default is indigo; emerald remains an available accent (Porto green). */
+  accent: 'indigo',
   density: 'comfortable',
   fontScale: 'standard',
   reducedMotion: false,
@@ -57,7 +57,9 @@ function resolveTheme(theme: ThemePref): 'light' | 'dark' {
 }
 
 export function applyPreferences(prefs: Partial<UserPreferences>) {
-  const next = { ...defaultPreferences, ...prefs } as UserPreferences;
+  /* Merge onto current store so partial /me payloads cannot wipe a saved accent
+     (e.g. Porto green / emerald) with the indigo product default. */
+  const next = { ...defaultPreferences, ...get(preferences), ...prefs } as UserPreferences;
   preferences.set(next);
   if (!browser) return;
 
@@ -71,7 +73,7 @@ export function applyPreferences(prefs: Partial<UserPreferences>) {
   document.documentElement.classList.toggle('reduce-motion', next.reducedMotion);
   document.documentElement.classList.toggle('high-contrast', next.highContrast);
 
-  const vars = accentVars[next.accent] || accentVars.emerald;
+  const vars = accentVars[next.accent] || accentVars.indigo;
   const root = document.documentElement;
   root.style.setProperty('--color-accent', vars.accent);
   root.style.setProperty('--color-accent-hover', vars.hover);
@@ -90,5 +92,46 @@ export function clearPreferencesCache() {
   if (browser) {
     localStorage.removeItem('rc_prefs');
     localStorage.removeItem('rc_theme');
+    /* Reset inline accent overrides so CSS theme tokens apply until next hydrate/login */
+    const root = document.documentElement;
+    for (const prop of [
+      '--color-accent',
+      '--color-accent-hover',
+      '--color-accent-soft',
+      '--color-accent-foreground',
+      '--color-focus',
+      '--color-primary',
+      '--color-primary-hover'
+    ]) {
+      root.style.removeProperty(prop);
+    }
+    root.classList.remove('dark', 'reduce-motion', 'high-contrast');
+    delete root.dataset.accent;
+    delete root.dataset.density;
+    delete root.dataset.fontScale;
+    delete root.dataset.themeSource;
   }
+}
+
+/**
+ * Apply cached prefs immediately so saved Porto green (emerald) / accents
+ * do not flash to the CSS indigo default before /auth/me returns.
+ * Server preferences from /me still win when applied afterwards.
+ */
+export function hydratePreferencesFromCache(): boolean {
+  if (!browser) return false;
+  try {
+    const raw = localStorage.getItem('rc_prefs');
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as Partial<UserPreferences>;
+    if (!parsed || typeof parsed !== 'object') return false;
+    applyPreferences(parsed);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (browser) {
+  hydratePreferencesFromCache();
 }

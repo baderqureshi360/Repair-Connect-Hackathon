@@ -66,7 +66,7 @@
       {$t('noPurchaseOrders')}
     </p>
   {:else}
-    <div class="overflow-x-auto rounded-[var(--radius-ui)] border border-border bg-surface-elevated">
+    <div class="data-table-shell">
       <table class="min-w-full text-start text-sm">
         <caption class="sr-only">{$t('purchaseOrders')}</caption>
         <thead class="border-b border-border text-muted">

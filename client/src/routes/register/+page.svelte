@@ -4,6 +4,7 @@
   import { setSession, type Role } from '$lib/stores/auth';
   import { t } from '$lib/i18n';
   import Alert from '$lib/components/Alert.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
 
   let name = $state('');
   let email = $state('');
@@ -33,27 +34,47 @@
   }
 </script>
 
-<main class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
-  <h1 class="text-2xl font-bold">{$t('registerTitle')}</h1>
-  <form class="mt-6 space-y-4" onsubmit={onSubmit}>
+<svelte:head>
+  <title>{$t('registerTitle')} — RepairConnect</title>
+</svelte:head>
+
+<main class="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">
+  <a href="/" class="mb-6 inline-flex items-center gap-2.5 text-sm font-semibold text-ink hover:opacity-90">
+    <BrandMark size={36} compact />
+    <span>{$t('appName')}</span>
+  </a>
+  <h1 class="text-xl font-semibold tracking-tight text-ink md:text-2xl">{$t('registerTitle')}</h1>
+  <form class="surface-card mt-6 space-y-4 p-5" onsubmit={onSubmit}>
     {#if error}
       <Alert type="error" role="alert" message={error} />
     {/if}
     <div>
-      <label class="mb-1 block text-sm font-medium" for="name">{$t('name')}</label>
-      <input id="name" required autocomplete="name" class="w-full rounded-md border border-border bg-surface-elevated px-3 py-2" bind:value={name} />
+      <label class="field-label" for="name">{$t('name')}</label>
+      <input id="name" required autocomplete="name" class="input-field" bind:value={name} />
     </div>
     <div>
-      <label class="mb-1 block text-sm font-medium" for="email">{$t('email')}</label>
-      <input id="email" type="email" required autocomplete="username" class="w-full rounded-md border border-border bg-surface-elevated px-3 py-2" bind:value={email} />
+      <label class="field-label" for="email">{$t('email')}</label>
+      <input id="email" type="email" required autocomplete="username" class="input-field" bind:value={email} />
     </div>
     <div>
-      <label class="mb-1 block text-sm font-medium" for="password">{$t('password')}</label>
-      <input id="password" type="password" required minlength="8" autocomplete="new-password" class="w-full rounded-md border border-border bg-surface-elevated px-3 py-2" bind:value={password} aria-describedby="password-hint" />
-      <p id="password-hint" class="mt-1 text-xs text-muted">{$t('passwordHint')}</p>
+      <label class="field-label" for="password">{$t('password')}</label>
+      <input
+        id="password"
+        type="password"
+        required
+        minlength="8"
+        autocomplete="new-password"
+        class="input-field"
+        bind:value={password}
+        aria-describedby="password-hint"
+      />
+      <p id="password-hint" class="field-hint">{$t('passwordHint')}</p>
     </div>
-    <button type="submit" class="w-full rounded-md bg-accent px-4 py-2 font-medium text-white" disabled={loading} aria-busy={loading}>
+    <button type="submit" class="btn btn-primary w-full" disabled={loading} aria-busy={loading}>
       {loading ? $t('loading') : $t('register')}
     </button>
   </form>
+  <p class="mt-4 text-sm">
+    <a class="underline" href="/login?portal=customer">{$t('login')}</a>
+  </p>
 </main>

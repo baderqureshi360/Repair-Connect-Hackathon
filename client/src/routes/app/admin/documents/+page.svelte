@@ -68,59 +68,94 @@
   }
 </script>
 
-<section class="mx-auto max-w-2xl space-y-6">
-  <PageHeader title="Document & receipt settings" subtitle="Shop branding and print defaults" />
+<section class="mx-auto min-w-0 max-w-2xl space-y-5 overflow-x-clip md:space-y-6">
+  <PageHeader
+    title="Document & receipt settings"
+    subtitle="Shop branding and print defaults"
+    breadcrumbs={[{ label: $t('home'), href: '/app/admin' }, { label: $t('documents') }]}
+  />
+
   {#if loading}
-    <Skeleton class="h-48 w-full" />
+    <div class="space-y-3" role="status" aria-busy="true" aria-label={$t('loading')}>
+      <Skeleton class="h-12 w-full" />
+      <Skeleton class="h-24 w-full" />
+      <Skeleton class="h-40 w-full" />
+    </div>
   {:else}
     {#if error}
       <Alert type="error" role="alert" message={error} />
     {/if}
-    <form class="space-y-4 rounded-lg border border-border bg-surface-elevated p-4" onsubmit={save}>
-      <div>
-        <label class="mb-1 block text-sm font-medium" for="legal">Business name</label>
-        <input id="legal" class="input-field w-full" bind:value={form.businessLegalName} />
-      </div>
-      <div>
-        <label class="mb-1 block text-sm font-medium" for="header">Receipt header</label>
-        <textarea id="header" class="input-field w-full" rows="2" bind:value={form.receiptHeader}></textarea>
-      </div>
-      <div>
-        <label class="mb-1 block text-sm font-medium" for="footer">Receipt footer</label>
-        <textarea id="footer" class="input-field w-full" rows="2" bind:value={form.receiptFooter}></textarea>
-      </div>
-      <div class="grid gap-3 sm:grid-cols-2">
+
+    {#if !shopId && error}
+      <p class="rounded-[var(--radius-ui)] bg-surface-muted px-3 py-8 text-center text-sm text-muted" role="status">
+        {$t('empty')}
+      </p>
+    {:else}
+      <form class="surface-card space-y-5 p-4 md:p-5" onsubmit={save}>
         <div>
-          <label class="mb-1 block text-sm font-medium" for="currency">Currency</label>
-          <input id="currency" class="input-field w-full" bind:value={form.currency} />
+          <label class="field-label" for="legal">Business name</label>
+          <input id="legal" class="input-field w-full" bind:value={form.businessLegalName} />
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium" for="taxRate">Tax %</label>
-          <input id="taxRate" type="number" min="0" max="100" step="0.01" class="input-field w-full" bind:value={form.taxRatePercent} />
-        </div>
-      </div>
-      <div>
-        <label class="mb-1 block text-sm font-medium" for="warranty">Warranty terms</label>
-        <textarea id="warranty" class="input-field w-full" rows="4" bind:value={form.warrantyTerms}></textarea>
-      </div>
-      <div class="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label class="mb-1 block text-sm font-medium" for="fmt">Default format</label>
-          <select id="fmt" class="input-field w-full" bind:value={form.defaultPrintFormat}>
-            <option value="a4">A4</option>
-            <option value="thermal80">80mm</option>
-            <option value="thermal58">58mm</option>
-          </select>
+          <label class="field-label" for="header">Receipt header</label>
+          <textarea id="header" class="input-field min-h-[4.5rem] w-full" rows="2" bind:value={form.receiptHeader}
+          ></textarea>
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium" for="plang">Print language</label>
-          <select id="plang" class="input-field w-full" bind:value={form.printLanguage}>
-            <option value="en">English</option>
-            <option value="ur">Urdu</option>
-          </select>
+          <label class="field-label" for="footer">Receipt footer</label>
+          <textarea id="footer" class="input-field min-h-[4.5rem] w-full" rows="2" bind:value={form.receiptFooter}
+          ></textarea>
         </div>
-      </div>
-      <Button type="submit" loading={saving}>Save settings</Button>
-    </form>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="field-label" for="currency">Currency</label>
+            <input id="currency" class="input-field w-full" bind:value={form.currency} />
+          </div>
+          <div>
+            <label class="field-label" for="taxRate">Tax %</label>
+            <input
+              id="taxRate"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              class="input-field w-full"
+              bind:value={form.taxRatePercent}
+            />
+          </div>
+        </div>
+        <div>
+          <label class="field-label" for="taxLabel">Tax label</label>
+          <input id="taxLabel" class="input-field w-full" bind:value={form.taxLabel} />
+        </div>
+        <div>
+          <label class="field-label" for="contactExtra">Extra contact line</label>
+          <input id="contactExtra" class="input-field w-full" bind:value={form.contactExtra} />
+        </div>
+        <div>
+          <label class="field-label" for="warranty">Warranty terms</label>
+          <textarea id="warranty" class="input-field min-h-[7rem] w-full" rows="4" bind:value={form.warrantyTerms}
+          ></textarea>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="field-label" for="fmt">Default format</label>
+            <select id="fmt" class="input-field w-full" bind:value={form.defaultPrintFormat}>
+              <option value="a4">A4</option>
+              <option value="thermal80">80mm</option>
+              <option value="thermal58">58mm</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="plang">Print language</label>
+            <select id="plang" class="input-field w-full" bind:value={form.printLanguage}>
+              <option value="en">English</option>
+              <option value="ur">Urdu</option>
+            </select>
+          </div>
+        </div>
+        <Button type="submit" variant="primary" loading={saving}>Save settings</Button>
+      </form>
+    {/if}
   {/if}
 </section>

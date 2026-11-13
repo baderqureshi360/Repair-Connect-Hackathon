@@ -3,6 +3,7 @@
   import { t } from '$lib/i18n';
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
 
   let email = $state('');
   let loading = $state(false);
@@ -35,9 +36,13 @@
 
 <svelte:head><title>Forgot password — RepairConnect</title></svelte:head>
 
-<main class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">
-  <a href="/login" class="mb-6 text-sm text-accent hover:underline">← {$t('login')}</a>
-  <h1 class="text-2xl font-bold">Forgot password</h1>
+<main class="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-12">
+  <a href="/" class="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-ink">
+    <BrandMark size={28} compact />
+    <span>{$t('appName')}</span>
+  </a>
+  <a href="/login" class="mb-4 text-sm text-accent hover:underline">← {$t('login')}</a>
+  <h1 class="text-xl font-semibold tracking-tight md:text-2xl">Forgot password</h1>
   <p class="mt-2 text-sm text-muted">
     Enter your account email. If an account exists, a reset instruction will be recorded securely. Email delivery depends
     on server configuration; contact your shop administrator if you do not receive further steps.

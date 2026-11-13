@@ -3,6 +3,7 @@
   import { user } from '$lib/stores/auth';
   import { t, lang } from '$lib/i18n';
   import Icon from '$lib/components/Icon.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
 
   let mobileNav = $state(false);
   let portalHref = $state('/app/customer');
@@ -137,9 +138,9 @@
 
   <header class="sticky top-0 z-40 overflow-x-clip border-b border-border/80 bg-surface-elevated/95 backdrop-blur">
     <div class="mx-auto flex h-16 w-full max-w-7xl flex-nowrap items-center gap-2 px-3 sm:gap-3 sm:px-4 md:px-6 lg:px-8">
-      <a href="/" class="flex min-w-0 shrink items-center gap-2 whitespace-nowrap font-bold text-accent">
-        <span class="sidebar-logo !h-8 !w-8 shrink-0" aria-hidden="true"><Icon name="wrench" size={14} /></span>
-        <span class="truncate">{$t('appName')}</span>
+      <a href="/" class="flex min-w-0 shrink items-center gap-2 whitespace-nowrap font-bold text-ink">
+        <BrandMark size={32} compact class="shrink-0" />
+        <span class="truncate text-accent">{$t('appName')}</span>
       </a>
 
       <nav
@@ -242,11 +243,14 @@
   <main id="main">
     <section id="home" class="relative overflow-hidden">
       <div
-        class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(130,180,64,0.16),transparent_55%),radial-gradient(ellipse_at_bottom_left,rgba(130,180,64,0.08),transparent_50%)]"
+        class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgb(79,70,229,0.14),transparent_55%),radial-gradient(ellipse_at_bottom_left,rgb(37,99,235,0.08),transparent_50%)]"
         aria-hidden="true"
       ></div>
       <div class="relative mx-auto max-w-7xl px-4 py-14 sm:py-16 md:px-6 md:py-20 lg:px-8 lg:py-24">
-        <p class="text-sm font-semibold uppercase tracking-[0.14em] text-accent">RepairConnect</p>
+        <div class="flex items-center gap-3">
+          <BrandMark size={40} compact />
+          <p class="text-sm font-semibold uppercase tracking-[0.14em] text-accent">RepairConnect</p>
+        </div>
         <h1
           class="mt-4 max-w-[18ch] text-balance text-4xl font-bold tracking-tight leading-[1.15] sm:max-w-3xl sm:text-5xl lg:text-[3.25rem] lg:leading-[1.12]"
         >

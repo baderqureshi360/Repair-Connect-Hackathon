@@ -1,5 +1,5 @@
 /** Resolve semantic chart colors from CSS tokens (light/dark aware). */
-const FALLBACK = ['#82b440', '#1565c0', '#0f766e', '#b45309', '#64748b', '#c62828', '#4b5563'];
+const FALLBACK = ['#4f46e5', '#1565c0', '#0f766e', '#b45309', '#64748b', '#c62828', '#4b5563'];
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === 'undefined') return fallback;

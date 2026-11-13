@@ -56,7 +56,7 @@
 
   function restoreDefaults() {
     /* Local restore only — does not PATCH until Save. Preserves intentional user saves. */
-    form = { ...defaultPreferences, accent: 'emerald' };
+    form = { ...defaultPreferences };
     applyPreferences(form);
   }
 </script>
@@ -69,7 +69,7 @@
     <Alert type="error" role="alert" message={error} />
   {/if}
 
-  <div class="rounded-lg border border-border bg-surface-elevated p-4">
+  <div class="surface-card p-4">
     <h2 class="text-sm font-semibold">{$t('keyboardShortcuts')}</h2>
     <p class="mt-1 text-sm text-muted">{$t('keyboardShortcutsHint')}</p>
     <p class="mt-2 text-xs text-muted">
@@ -85,7 +85,7 @@
   </div>
 
   <form
-    class="space-y-5 rounded-lg border border-border bg-surface-elevated p-4"
+    class="surface-card space-y-5 p-4 md:p-5"
     data-rc-save
     data-rc-submit
     onsubmit={save}
@@ -102,19 +102,28 @@
     <fieldset>
       <legend class="mb-2 text-sm font-medium">Accent color</legend>
       <p class="mb-2 text-xs text-muted">
-        Saved accents are kept until you change them. Restore defaults selects Porto green locally —
+        Saved accents are kept until you change them. Restore defaults selects Indigo locally —
         click Save preferences to persist.
       </p>
       <div class="flex flex-wrap gap-2">
         {#each [
-          { id: 'emerald', label: 'Porto green' },
-          { id: 'indigo', label: 'Indigo' },
-          { id: 'blue', label: 'Blue' },
-          { id: 'teal', label: 'Teal' },
-          { id: 'violet', label: 'Violet' }
+          { id: 'indigo', label: 'Indigo', swatch: '#3730a3' },
+          { id: 'blue', label: 'Blue', swatch: '#1d4ed8' },
+          { id: 'teal', label: 'Teal', swatch: '#0f766e' },
+          { id: 'violet', label: 'Violet', swatch: '#6d28d9' },
+          { id: 'emerald', label: 'Porto green', swatch: '#82b440' }
         ] as accent}
-          <label class="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+          <label
+            class={`inline-flex items-center gap-2 rounded-[var(--radius-ui)] border px-3 py-2 text-sm ${
+              form.accent === accent.id ? 'border-[color:var(--color-primary)] bg-accent-soft' : 'border-border'
+            }`}
+          >
             <input type="radio" name="accent" value={accent.id} bind:group={form.accent} />
+            <span
+              class="inline-block h-3.5 w-3.5 rounded-full border border-border"
+              style={`background:${accent.swatch}`}
+              aria-hidden="true"
+            ></span>
             <span>{accent.label}</span>
           </label>
         {/each}

@@ -40,91 +40,97 @@ export type NavKey =
   | 'platformAudit'
   | 'platformReports';
 
-export type PortalNavItem = { href: string; key: NavKey; icon: string };
+export type PortalNavItem = {
+  href: string;
+  key: NavKey;
+  icon: string;
+  /** Visual section grouping in the sidebar (separator when section changes). */
+  section?: string;
+};
 
 export const pendingNavByRole: Partial<Record<Role, PortalNavItem[]>> = {
   supplier: [
-    { href: '/app/supplier-application/status', key: 'applicationStatusTitle', icon: 'clipboard' }
+    { href: '/app/supplier-application/status', key: 'applicationStatusTitle', icon: 'clipboard', section: 'main' }
   ],
   shop_admin: [
-    { href: '/app/shop-application/status', key: 'applicationStatusTitle', icon: 'clipboard' }
+    { href: '/app/shop-application/status', key: 'applicationStatusTitle', icon: 'clipboard', section: 'main' }
   ]
 };
 
 export const navByRole: Record<Role, PortalNavItem[]> = {
   customer: [
-    { href: '/app/customer', key: 'dashboard', icon: 'layoutDashboard' },
-    { href: '/app/customer/shops', key: 'findRepairShops', icon: 'building' },
-    { href: '/app/customer/new', key: 'submitRepairRequest', icon: 'clipboard' },
-    { href: '/app/customer/repairs', key: 'myRepairs', icon: 'wrench' },
-    { href: '/app/customer/appointments', key: 'myAppointments', icon: 'calendar' },
-    { href: '/app/customer/receipts', key: 'myReceipts', icon: 'fileText' },
-    { href: '/app/notifications', key: 'notifications', icon: 'bell' },
-    { href: '/app/profile', key: 'profile', icon: 'user' }
+    { href: '/app/customer', key: 'dashboard', icon: 'layoutDashboard', section: 'main' },
+    { href: '/app/customer/shops', key: 'findRepairShops', icon: 'building', section: 'main' },
+    { href: '/app/customer/new', key: 'submitRepairRequest', icon: 'clipboard', section: 'main' },
+    { href: '/app/customer/repairs', key: 'myRepairs', icon: 'wrench', section: 'activity' },
+    { href: '/app/customer/appointments', key: 'myAppointments', icon: 'calendar', section: 'activity' },
+    { href: '/app/customer/receipts', key: 'myReceipts', icon: 'fileText', section: 'activity' },
+    { href: '/app/notifications', key: 'notifications', icon: 'bell', section: 'account' },
+    { href: '/app/profile', key: 'profile', icon: 'user', section: 'account' }
   ],
   mechanic: [
-    { href: '/app/mechanic', key: 'dashboard', icon: 'layoutDashboard' },
-    { href: '/app/mechanic/jobs', key: 'repairs', icon: 'wrench' },
-    { href: '/app/mechanic/reports', key: 'reports', icon: 'chart' },
-    { href: '/app/notifications', key: 'notifications', icon: 'bell' },
-    { href: '/app/profile', key: 'profile', icon: 'user' },
-    { href: '/app/appearance', key: 'appearance', icon: 'palette' }
+    { href: '/app/mechanic', key: 'dashboard', icon: 'layoutDashboard', section: 'main' },
+    { href: '/app/mechanic/jobs', key: 'repairs', icon: 'wrench', section: 'main' },
+    { href: '/app/mechanic/reports', key: 'reports', icon: 'chart', section: 'main' },
+    { href: '/app/notifications', key: 'notifications', icon: 'bell', section: 'account' },
+    { href: '/app/profile', key: 'profile', icon: 'user', section: 'account' },
+    { href: '/app/appearance', key: 'appearance', icon: 'palette', section: 'account' }
   ],
   parts_coordinator: [
-    { href: '/app/parts', key: 'dashboard', icon: 'layoutDashboard' },
-    { href: '/app/parts/inventory', key: 'inventory', icon: 'package' },
-    { href: '/app/parts/requests', key: 'partsRequests', icon: 'clipboard' },
-    { href: '/app/admin/purchase-orders', key: 'purchaseOrders', icon: 'fileText' },
-    { href: '/app/parts/suppliers', key: 'suppliers', icon: 'factory' },
-    { href: '/app/parts/transfers', key: 'transfers', icon: 'truck' },
-    { href: '/app/parts/reports', key: 'reports', icon: 'chart' },
-    { href: '/app/notifications', key: 'notifications', icon: 'bell' },
-    { href: '/app/profile', key: 'profile', icon: 'user' },
-    { href: '/app/appearance', key: 'appearance', icon: 'palette' }
+    { href: '/app/parts', key: 'dashboard', icon: 'layoutDashboard', section: 'main' },
+    { href: '/app/parts/inventory', key: 'inventory', icon: 'package', section: 'stock' },
+    { href: '/app/parts/requests', key: 'partsRequests', icon: 'clipboard', section: 'stock' },
+    { href: '/app/admin/purchase-orders', key: 'purchaseOrders', icon: 'fileText', section: 'stock' },
+    { href: '/app/parts/suppliers', key: 'suppliers', icon: 'factory', section: 'stock' },
+    { href: '/app/parts/transfers', key: 'transfers', icon: 'truck', section: 'stock' },
+    { href: '/app/parts/reports', key: 'reports', icon: 'chart', section: 'stock' },
+    { href: '/app/notifications', key: 'notifications', icon: 'bell', section: 'account' },
+    { href: '/app/profile', key: 'profile', icon: 'user', section: 'account' },
+    { href: '/app/appearance', key: 'appearance', icon: 'palette', section: 'account' }
   ],
   shop_admin: [
-    { href: '/app/admin', key: 'dashboard', icon: 'layoutDashboard' },
-    { href: '/app/admin/appointments', key: 'appointments', icon: 'calendar' },
-    { href: '/app/admin/repairs', key: 'repairs', icon: 'wrench' },
-    { href: '/app/admin/customers', key: 'customers', icon: 'users' },
-    { href: '/app/parts/inventory', key: 'inventory', icon: 'package' },
-    { href: '/app/admin/suppliers', key: 'supplierMarketplace', icon: 'factory' },
-    { href: '/app/admin/rfqs', key: 'rfqs', icon: 'clipboard' },
-    { href: '/app/admin/purchase-orders', key: 'purchaseOrders', icon: 'fileText' },
-    { href: '/app/admin/supplier-finance', key: 'supplierFinance', icon: 'chart' },
-    { href: '/app/admin/purchasing-analytics', key: 'purchasingAnalytics', icon: 'chart' },
-    { href: '/app/admin/messages', key: 'messages', icon: 'bell' },
-    { href: '/app/admin/shops', key: 'shopManagement', icon: 'building' },
-    { href: '/app/admin/reports', key: 'reports', icon: 'chart' },
-    { href: '/app/admin/documents', key: 'documents', icon: 'fileText' },
-    { href: '/app/notifications', key: 'notifications', icon: 'bell' },
-    { href: '/app/admin/staff', key: 'staff', icon: 'users' },
-    { href: '/app/appearance', key: 'settings', icon: 'settings' }
+    { href: '/app/admin', key: 'dashboard', icon: 'layoutDashboard', section: 'ops' },
+    { href: '/app/admin/appointments', key: 'appointments', icon: 'calendar', section: 'ops' },
+    { href: '/app/admin/repairs', key: 'repairs', icon: 'wrench', section: 'ops' },
+    { href: '/app/admin/customers', key: 'customers', icon: 'users', section: 'ops' },
+    { href: '/app/parts/inventory', key: 'inventory', icon: 'package', section: 'purchasing' },
+    { href: '/app/admin/suppliers', key: 'supplierMarketplace', icon: 'factory', section: 'purchasing' },
+    { href: '/app/admin/rfqs', key: 'rfqs', icon: 'clipboard', section: 'purchasing' },
+    { href: '/app/admin/purchase-orders', key: 'purchaseOrders', icon: 'fileText', section: 'purchasing' },
+    { href: '/app/admin/supplier-finance', key: 'supplierFinance', icon: 'chart', section: 'purchasing' },
+    { href: '/app/admin/purchasing-analytics', key: 'purchasingAnalytics', icon: 'chart', section: 'purchasing' },
+    { href: '/app/admin/messages', key: 'messages', icon: 'bell', section: 'comms' },
+    { href: '/app/notifications', key: 'notifications', icon: 'bell', section: 'comms' },
+    { href: '/app/admin/shops', key: 'shopManagement', icon: 'building', section: 'admin' },
+    { href: '/app/admin/reports', key: 'reports', icon: 'chart', section: 'admin' },
+    { href: '/app/admin/documents', key: 'documents', icon: 'fileText', section: 'admin' },
+    { href: '/app/admin/staff', key: 'staff', icon: 'users', section: 'admin' },
+    { href: '/app/appearance', key: 'settings', icon: 'settings', section: 'admin' }
   ],
   supplier: [
-    { href: '/app/supplier', key: 'dashboard', icon: 'layoutDashboard' },
-    { href: '/app/supplier/catalog', key: 'catalog', icon: 'package' },
-    { href: '/app/supplier/rfqs', key: 'rfqs', icon: 'clipboard' },
-    { href: '/app/supplier/purchase-orders', key: 'purchaseOrders', icon: 'fileText' },
-    { href: '/app/supplier/performance', key: 'performance', icon: 'chart' },
-    { href: '/app/supplier/messages', key: 'messages', icon: 'bell' },
-    { href: '/app/supplier/profile', key: 'profile', icon: 'building' },
-    { href: '/app/notifications', key: 'notifications', icon: 'bell' },
-    { href: '/app/appearance', key: 'appearance', icon: 'palette' }
+    { href: '/app/supplier', key: 'dashboard', icon: 'layoutDashboard', section: 'main' },
+    { href: '/app/supplier/catalog', key: 'catalog', icon: 'package', section: 'main' },
+    { href: '/app/supplier/rfqs', key: 'rfqs', icon: 'clipboard', section: 'main' },
+    { href: '/app/supplier/purchase-orders', key: 'purchaseOrders', icon: 'fileText', section: 'main' },
+    { href: '/app/supplier/performance', key: 'performance', icon: 'chart', section: 'main' },
+    { href: '/app/supplier/messages', key: 'messages', icon: 'bell', section: 'account' },
+    { href: '/app/supplier/profile', key: 'profile', icon: 'building', section: 'account' },
+    { href: '/app/notifications', key: 'notifications', icon: 'bell', section: 'account' },
+    { href: '/app/appearance', key: 'appearance', icon: 'palette', section: 'account' }
   ],
   platform_operator: [
-    { href: '/app/platform', key: 'dashboard', icon: 'layoutDashboard' },
-    { href: '/app/platform/shop-applications', key: 'shopApplications', icon: 'clipboard' },
-    { href: '/app/platform/supplier-applications', key: 'supplierApplications', icon: 'factory' },
-    { href: '/app/platform/supplier-reviews', key: 'supplierReviews', icon: 'clipboard' },
-    { href: '/app/platform/businesses', key: 'platformBusinesses', icon: 'building' },
-    { href: '/app/platform/accounts', key: 'platformAccounts', icon: 'users' },
-    { href: '/app/platform/audit', key: 'platformAudit', icon: 'fileText' },
-    { href: '/app/platform/reports', key: 'platformReports', icon: 'chart' },
-    { href: '/app/notifications', key: 'notifications', icon: 'bell' },
-    { href: '/app/platform/settings', key: 'settings', icon: 'settings' },
-    { href: '/app/profile', key: 'profile', icon: 'user' },
-    { href: '/app/appearance', key: 'appearance', icon: 'palette' }
+    { href: '/app/platform', key: 'dashboard', icon: 'layoutDashboard', section: 'main' },
+    { href: '/app/platform/shop-applications', key: 'shopApplications', icon: 'clipboard', section: 'onboarding' },
+    { href: '/app/platform/supplier-applications', key: 'supplierApplications', icon: 'factory', section: 'onboarding' },
+    { href: '/app/platform/supplier-reviews', key: 'supplierReviews', icon: 'clipboard', section: 'onboarding' },
+    { href: '/app/platform/businesses', key: 'platformBusinesses', icon: 'building', section: 'directory' },
+    { href: '/app/platform/accounts', key: 'platformAccounts', icon: 'users', section: 'directory' },
+    { href: '/app/platform/audit', key: 'platformAudit', icon: 'fileText', section: 'directory' },
+    { href: '/app/platform/reports', key: 'platformReports', icon: 'chart', section: 'directory' },
+    { href: '/app/notifications', key: 'notifications', icon: 'bell', section: 'account' },
+    { href: '/app/platform/settings', key: 'settings', icon: 'settings', section: 'account' },
+    { href: '/app/profile', key: 'profile', icon: 'user', section: 'account' },
+    { href: '/app/appearance', key: 'appearance', icon: 'palette', section: 'account' }
   ]
 };
 
