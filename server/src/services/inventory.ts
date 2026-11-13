@@ -110,7 +110,32 @@ export async function adjustStock(input: {
     details: { quantityDelta: input.quantityDelta, reason: input.reason }
   });
 
+  await maybeNotifyLowStock(part, input.userId);
+
   return part;
+}
+
+/** Deduped low-stock alert for shop admin + parts coordinator when available ≤ reorder level. */
+async function maybeNotifyLowStock(
+  part: { _id: mongoose.Types.ObjectId; shop: unknown; name: string; sku: string; quantityAvailable: number; reorderLevel: number },
+  actorUserId?: string
+) {
+  if (part.quantityAvailable > part.reorderLevel) return;
+  try {
+    const { notifyShopMembers } = await import('./notifications.js');
+    await notifyShopMembers({
+      shopId: part.shop as mongoose.Types.ObjectId,
+      roles: ['shop_admin', 'parts_coordinator'],
+      type: 'low_stock',
+      title: 'Low stock alert',
+      message: `${part.name} (${part.sku}): ${part.quantityAvailable} left (reorder at ${part.reorderLevel})`,
+      meta: { partId: String(part._id), hrefHint: 'inventory' },
+      dedupeKeyPrefix: `low_stock:${part._id}:${part.quantityAvailable}`,
+      excludeUserIds: actorUserId ? [actorUserId] : []
+    });
+  } catch {
+    /* non-fatal */
+  }
 }
 
 function isTransientTxnError(err: unknown): boolean {
@@ -320,9 +345,10 @@ export async function reserveStock(input: {
       }
       const committed: ReserveResult = result;
 
-      // Emit customer-visible tracking only after successful commit
+      // Emit customer-visible tracking + mechanic parts-available after successful commit
       try {
         const { recordTrackingEvent } = await import('./trackingEvents.js');
+        const { notify } = await import('./notifications.js');
         const repairId = committed.partsRequest.repairRequest;
         const reservationId = committed.reservation._id;
         const repair = await RepairRequest.findById(repairId);
@@ -333,7 +359,19 @@ export async function reserveStock(input: {
             customerId: repair.customer,
             dedupeKey: `parts_reserved:${reservationId}`
           });
+          if (repair.assignedMechanic) {
+            await notify({
+              user: repair.assignedMechanic,
+              type: 'parts_available',
+              title: 'Parts reserved for your job',
+              message: `Parts are reserved for ${repair.referenceNumber}`,
+              repairRequest: repair._id,
+              meta: { reservationId: String(reservationId), hrefHint: 'repair' },
+              dedupeKey: `parts_available:${reservationId}:${repair.assignedMechanic}`
+            });
+          }
         }
+        await maybeNotifyLowStock(committed.part, input.userId);
       } catch {
         /* non-fatal for reservation success */
       }

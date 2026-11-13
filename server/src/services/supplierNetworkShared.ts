@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
-import { Notification, SupplierBusiness, User } from '../models/index.js';
+import { SupplierBusiness, User } from '../models/index.js';
 import { AppError } from '../utils/errors.js';
 import type { AuthUser } from '../middleware/auth.js';
 
@@ -106,13 +106,20 @@ export async function notifyUsers(
   message: string,
   meta?: Record<string, unknown>
 ) {
-  const unique = [...new Set(userIds.filter(Boolean).map(String))];
-  for (const userId of unique) {
-    try {
-      await Notification.create({ user: userId, type, title, message, meta });
-    } catch {
-      /* non-blocking */
-    }
+  // Route through transactional outbox for prefs + dedupe (same Notification collection).
+  try {
+    const { notifyUsersViaOutbox } = await import('./notifications.js');
+    const stamp = `${type}:${title}:${JSON.stringify(meta || {})}`.slice(0, 120);
+    await notifyUsersViaOutbox({
+      userIds,
+      type,
+      title,
+      message,
+      meta,
+      dedupeKeyPrefix: `supplier:${stamp}`
+    });
+  } catch {
+    /* non-blocking — supplier flows must not fail on notification delivery */
   }
 }
 

@@ -23,10 +23,20 @@ const TYPE_PREF_MAP: Record<string, string> = {
   repair_completed: 'repairUpdates',
   payment_received: 'repairUpdates',
   repair_message: 'repairUpdates',
+  new_repair_request: 'repairUpdates',
+  staff_activity: 'repairUpdates',
+  customer_update: 'repairUpdates',
   estimate_ready: 'estimateRequests',
   estimate_approved: 'estimateRequests',
   estimate_rejected: 'estimateRequests',
-  estimate_pending: 'estimateRequests'
+  estimate_pending: 'estimateRequests',
+  pending_approval: 'estimateRequests',
+  parts_request: 'partsAlerts',
+  parts_available: 'partsAlerts',
+  low_stock: 'partsAlerts',
+  supplier_po: 'partsAlerts',
+  supplier_grn: 'partsAlerts',
+  supplier_shipment: 'partsAlerts'
 };
 
 let processing = false;

@@ -370,11 +370,11 @@ export async function acknowledgePurchaseOrder(
   });
 
   await notifyUsers(
-    await shopAdminUserIds(String(po.shop)),
+    await shopReceivingUserIds(String(po.shop)),
     'supplier_po',
     'PO acknowledged',
     `${po.publicId} was acknowledged by the supplier`,
-    { purchaseOrderId: String(po._id) }
+    { purchaseOrderId: String(po._id), hrefHint: 'purchase_order' }
   );
 
   return serializePurchaseOrder(po);
@@ -405,11 +405,11 @@ export async function rejectPurchaseOrder(user: AuthUser, poId: string, reason: 
   });
 
   await notifyUsers(
-    await shopAdminUserIds(String(po.shop)),
+    await shopReceivingUserIds(String(po.shop)),
     'supplier_po',
     'PO rejected',
     `${po.publicId} was rejected: ${trimmed}`,
-    { purchaseOrderId: String(po._id) }
+    { purchaseOrderId: String(po._id), hrefHint: 'purchase_order' }
   );
 
   return serializePurchaseOrder(po);

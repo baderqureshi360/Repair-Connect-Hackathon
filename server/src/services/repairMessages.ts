@@ -117,16 +117,28 @@ export async function postRepairMessage(input: {
 
   if (visibility === 'customer_visible') {
     if (input.user.role === 'customer') {
-      // Notify assigned mechanic and shop admins via assigned mechanic + skip broadcast complexity
       if (repair.assignedMechanic) {
         await notify({
           user: repair.assignedMechanic,
           type: 'repair_message',
           title: 'New customer message',
           message: `Customer messaged about ${repair.referenceNumber}`,
-          repairRequest: repair._id
+          repairRequest: repair._id,
+          dedupeKey: `repair_message:mech:${message._id}`
         });
       }
+      const { notifyShopMembers } = await import('./notifications.js');
+      await notifyShopMembers({
+        shopId: repair.shop,
+        roles: ['shop_admin'],
+        type: 'customer_update',
+        title: 'Customer message',
+        message: `New customer message on ${repair.referenceNumber}`,
+        repairRequest: repair._id,
+        meta: { messageId: String(message._id) },
+        dedupeKeyPrefix: `customer_update:msg:${message._id}`,
+        excludeUserIds: [repair.assignedMechanic]
+      });
     } else {
       await notify({
         user: repair.customer,

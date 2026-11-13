@@ -16,7 +16,7 @@ import {
   assertShopReceivingAccess,
   notifyUsers,
   publicRef,
-  shopAdminUserIds,
+  shopReceivingUserIds,
   supplierOwnerId
 } from './supplierNetworkShared.js';
 import { postLedgerEntry } from './supplierLedger.js';
@@ -320,20 +320,25 @@ export async function postGoodsReceipt(input: {
 
   if (!result.idempotentHit) {
     const owner = await supplierOwnerId(String(result.lockedPo.supplierBusiness));
+    const receivers = await shopReceivingUserIds(String(result.lockedPo.shop));
     await notifyUsers(
-      [owner, ...(await shopAdminUserIds(String(result.lockedPo.shop)))],
+      [owner, ...receivers],
       'supplier_grn',
       'Goods received',
       `${result.grn.publicId} posted for ${result.lockedPo.publicId}`,
-      { grnId: String(result.grn._id), purchaseOrderId: String(result.lockedPo._id) }
+      {
+        grnId: String(result.grn._id),
+        purchaseOrderId: String(result.lockedPo._id),
+        hrefHint: 'purchase_order'
+      }
     );
     if (result.hasDamageOrShort) {
       await notifyUsers(
-        [owner, ...(await shopAdminUserIds(String(result.lockedPo.shop)))],
+        [owner, ...receivers],
         'supplier_grn',
         'Damaged / short / rejected receipt',
         `${result.grn.publicId} includes damaged, short, or rejected quantities`,
-        { grnId: String(result.grn._id) }
+        { grnId: String(result.grn._id), hrefHint: 'purchase_order' }
       );
     }
   }

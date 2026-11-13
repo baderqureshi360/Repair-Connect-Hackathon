@@ -1,8 +1,15 @@
 import type { ClientSession, Types } from 'mongoose';
-import { User } from '../models/index.js';
+import { ShopMembership, User } from '../models/index.js';
 import { enqueueOutboxEvent, processOutboxBatch } from './outbox.js';
 
-const TYPE_PREF_MAP: Record<string, keyof NonNullable<UserPrefs>> = {
+type UserPrefs = {
+  repairUpdates?: boolean;
+  estimateRequests?: boolean;
+  partsAlerts?: boolean;
+  appointmentReminders?: boolean;
+};
+
+const TYPE_PREF_MAP: Record<string, keyof UserPrefs> = {
   repair_completed: 'repairUpdates',
   repair_assigned: 'repairUpdates',
   diagnosis_ready: 'repairUpdates',
@@ -12,11 +19,18 @@ const TYPE_PREF_MAP: Record<string, keyof NonNullable<UserPrefs>> = {
   estimate_ready: 'estimateRequests',
   parts_shortage: 'partsAlerts',
   parts_reserved: 'partsAlerts',
+  parts_available: 'partsAlerts',
+  parts_request: 'partsAlerts',
+  low_stock: 'partsAlerts',
   transfer_received: 'partsAlerts',
   appointment_booked: 'appointmentReminders',
   appointment_reminder: 'appointmentReminders',
   repair_message: 'repairUpdates',
   payment_received: 'repairUpdates',
+  new_repair_request: 'repairUpdates',
+  pending_approval: 'estimateRequests',
+  staff_activity: 'repairUpdates',
+  customer_update: 'repairUpdates',
   tracking_repair_received: 'repairUpdates',
   tracking_mechanic_assigned: 'repairUpdates',
   tracking_diagnosis_completed: 'repairUpdates',
@@ -35,15 +49,18 @@ const TYPE_PREF_MAP: Record<string, keyof NonNullable<UserPrefs>> = {
   tracking_repair_started: 'repairUpdates',
   tracking_ready_for_collection: 'repairUpdates',
   tracking_repair_collected: 'repairUpdates',
-  tracking_message_received: 'repairUpdates'
+  tracking_message_received: 'repairUpdates',
+  // Supplier network types — map to partsAlerts for shop staff who opted out of parts noise
+  supplier_po: 'partsAlerts',
+  supplier_grn: 'partsAlerts',
+  supplier_shipment: 'partsAlerts',
+  supplier_rfq: 'partsAlerts',
+  supplier_quotation: 'partsAlerts',
+  supplier_finance: 'partsAlerts',
+  supplier_message: 'repairUpdates'
 };
 
-type UserPrefs = {
-  repairUpdates?: boolean;
-  estimateRequests?: boolean;
-  partsAlerts?: boolean;
-  appointmentReminders?: boolean;
-};
+export type ShopStaffRole = 'shop_admin' | 'parts_coordinator' | 'mechanic';
 
 /**
  * Enqueue a customer/staff notification through the transactional outbox.
@@ -99,4 +116,67 @@ export async function notify(input: {
     await processOutboxBatch(10);
   }
   return event;
+}
+
+/** Notify many users with per-user dedupe keys (skips null/duplicate ids). */
+export async function notifyUsersViaOutbox(input: {
+  userIds: Array<string | Types.ObjectId | null | undefined>;
+  type: string;
+  title: string;
+  message: string;
+  repairRequest?: string | Types.ObjectId;
+  meta?: unknown;
+  /** Prefix; each user gets `${prefix}:${userId}` (max 200 chars). */
+  dedupeKeyPrefix: string;
+  session?: ClientSession;
+}) {
+  const unique = [...new Set(input.userIds.filter(Boolean).map(String))];
+  for (const userId of unique) {
+    await notify({
+      user: userId,
+      type: input.type,
+      title: input.title,
+      message: input.message,
+      repairRequest: input.repairRequest,
+      meta: input.meta,
+      dedupeKey: `${input.dedupeKeyPrefix}:${userId}`.slice(0, 200),
+      session: input.session
+    });
+  }
+}
+
+/** Resolve active shop members by role and notify them (tenant-scoped by membership). */
+export async function notifyShopMembers(input: {
+  shopId: string | Types.ObjectId;
+  roles: ShopStaffRole[];
+  type: string;
+  title: string;
+  message: string;
+  repairRequest?: string | Types.ObjectId;
+  meta?: unknown;
+  dedupeKeyPrefix: string;
+  excludeUserIds?: Array<string | Types.ObjectId | null | undefined>;
+  session?: ClientSession;
+}) {
+  const memberships = await ShopMembership.find({
+    shop: input.shopId,
+    role: { $in: input.roles },
+    isActive: true
+  })
+    .select('user')
+    .session(input.session || null);
+
+  const exclude = new Set((input.excludeUserIds || []).filter(Boolean).map(String));
+  const userIds = memberships.map((m) => String(m.user)).filter((id) => !exclude.has(id));
+
+  await notifyUsersViaOutbox({
+    userIds,
+    type: input.type,
+    title: input.title,
+    message: input.message,
+    repairRequest: input.repairRequest,
+    meta: input.meta,
+    dedupeKeyPrefix: input.dedupeKeyPrefix,
+    session: input.session
+  });
 }

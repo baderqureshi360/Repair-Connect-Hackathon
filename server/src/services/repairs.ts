@@ -175,6 +175,19 @@ export async function createRepairRequest(input: {
     dedupeKey: 'repair_received'
   });
 
+  // Shop admins: new repair request (customer-safe message — no private notes).
+  const { notifyShopMembers } = await import('./notifications.js');
+  await notifyShopMembers({
+    shopId: input.shopId,
+    roles: ['shop_admin'],
+    type: 'new_repair_request',
+    title: 'New repair request',
+    message: `${created.referenceNumber}: ${input.deviceType} ${input.brand} ${input.model}`,
+    repairRequest: created._id,
+    meta: { referenceNumber: created.referenceNumber, hrefHint: 'repair' },
+    dedupeKeyPrefix: `new_repair:${created._id}`
+  });
+
   const obj = stripTrackingSecrets(created.toObject() as Record<string, unknown>);
   return {
     ...obj,
@@ -415,14 +428,17 @@ export async function submitEstimate(input: {
     title: revisesApproved ? 'Revised repair estimate ready' : 'Repair estimate ready',
     message: `Estimate v${version} for ${repair.referenceNumber}: ${totalCost} PKR`,
     repairRequest: repair._id,
-    meta: { estimateId: estimate._id, totalCost, version, revisesApproved }
+    meta: { estimateId: estimate._id, totalCost, version, revisesApproved },
+    dedupeKey: `estimate_ready:${estimate._id}`
   });
 
+  // Tracking timeline kept; customer inbox already covered by estimate_ready (avoid duplicate).
   await recordTrackingEvent({
     repairId: repair._id,
     eventKey: version > 1 || revisesApproved ? 'estimate_revised' : 'estimate_prepared',
     customerId: repair.customer,
-    dedupeKey: `estimate:${estimate._id}`
+    dedupeKey: `estimate:${estimate._id}`,
+    notifyCustomer: false
   });
   await recordTrackingEvent({
     repairId: repair._id,
@@ -430,6 +446,19 @@ export async function submitEstimate(input: {
     customerId: repair.customer,
     dedupeKey: `estimate_awaiting:${estimate._id}`,
     notifyCustomer: false
+  });
+
+  const { notifyShopMembers } = await import('./notifications.js');
+  await notifyShopMembers({
+    shopId: repair.shop,
+    roles: ['shop_admin'],
+    type: 'pending_approval',
+    title: 'Estimate awaiting customer approval',
+    message: `${repair.referenceNumber}: estimate v${version} (${totalCost} PKR)`,
+    repairRequest: repair._id,
+    meta: { estimateId: String(estimate._id), version, totalCost },
+    dedupeKeyPrefix: `pending_approval:${estimate._id}`,
+    excludeUserIds: [input.mechanic.id]
   });
 
   return estimate;
@@ -495,9 +524,22 @@ export async function decideEstimate(input: {
           ? `Customer approved estimate v${estimate.version} for ${repair.referenceNumber} — ready to start`
           : `Customer approved estimate v${estimate.version} for ${repair.referenceNumber}`,
         repairRequest: repair._id,
-        meta: { estimateId: estimate._id, version: estimate.version }
+        meta: { estimateId: estimate._id, version: estimate.version },
+        dedupeKey: `estimate_approved:${estimate._id}:${repair.assignedMechanic}`
       });
     }
+    const { notifyShopMembers } = await import('./notifications.js');
+    await notifyShopMembers({
+      shopId: repair.shop,
+      roles: ['shop_admin'],
+      type: 'customer_update',
+      title: 'Customer approved estimate',
+      message: `${repair.referenceNumber}: estimate v${estimate.version} approved`,
+      repairRequest: repair._id,
+      meta: { estimateId: String(estimate._id), decision: 'approved' },
+      dedupeKeyPrefix: `customer_update:approved:${estimate._id}`,
+      excludeUserIds: [repair.assignedMechanic]
+    });
   } else {
     await transitionStatus(
       repair._id,
@@ -511,9 +553,22 @@ export async function decideEstimate(input: {
         type: 'estimate_rejected',
         title: 'Estimate rejected',
         message: `Customer rejected estimate for ${repair.referenceNumber}`,
-        repairRequest: repair._id
+        repairRequest: repair._id,
+        dedupeKey: `estimate_rejected:${estimate._id}:${repair.assignedMechanic}`
       });
     }
+    const { notifyShopMembers } = await import('./notifications.js');
+    await notifyShopMembers({
+      shopId: repair.shop,
+      roles: ['shop_admin'],
+      type: 'customer_update',
+      title: 'Customer rejected estimate',
+      message: `${repair.referenceNumber}: estimate rejected`,
+      repairRequest: repair._id,
+      meta: { estimateId: String(estimate._id), decision: 'rejected' },
+      dedupeKeyPrefix: `customer_update:rejected:${estimate._id}`,
+      excludeUserIds: [repair.assignedMechanic]
+    });
   }
 
   await recordTrackingEvent({
@@ -678,6 +733,23 @@ export async function requestParts(input: {
     await transitionStatus(repair._id, 'awaiting_parts', input.mechanic.id, 'Parts requested');
   }
 
+  const { notifyShopMembers } = await import('./notifications.js');
+  await notifyShopMembers({
+    shopId: repair.shop,
+    roles: ['shop_admin', 'parts_coordinator'],
+    type: 'parts_request',
+    title: 'Parts requested',
+    message: `${repair.referenceNumber}: ${part.name || part.sku || 'part'} × ${input.quantity}`,
+    repairRequest: repair._id,
+    meta: {
+      partsRequestId: String(partsRequest._id),
+      partId: String(part._id),
+      hrefHint: 'parts_request'
+    },
+    dedupeKeyPrefix: `parts_request:${partsRequest._id}`,
+    excludeUserIds: [input.mechanic.id]
+  });
+
   return partsRequest;
 }
 
@@ -817,11 +889,26 @@ export async function completeRepair(input: {
   kickOutboxProcessor();
   await processOutboxBatch(10);
 
+  // Customer already notified via repair_completed; keep timeline without duplicate inbox ping.
   await recordTrackingEvent({
     repairId: repair._id,
     eventKey: 'ready_for_collection',
     customerId: repair.customer,
-    dedupeKey: `ready_for_collection:${repair._id}`
+    dedupeKey: `ready_for_collection:${repair._id}`,
+    notifyCustomer: false
+  });
+
+  const { notifyShopMembers } = await import('./notifications.js');
+  await notifyShopMembers({
+    shopId: repair.shop,
+    roles: ['shop_admin'],
+    type: 'staff_activity',
+    title: 'Repair ready for collection',
+    message: `${repair.referenceNumber} is ready for collection`,
+    repairRequest: repair._id,
+    meta: { finalCost: input.finalCost },
+    dedupeKeyPrefix: `staff_ready_collection:${repair._id}`,
+    excludeUserIds: [input.mechanic.id]
   });
 
   return RepairRequest.findById(repair._id);

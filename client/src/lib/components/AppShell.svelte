@@ -12,12 +12,14 @@
   import { navByRole, pendingNavByRole } from '$lib/navigation/portalNav';
   import { shortcutManager } from '$lib/keyboard/manager';
   import { commandPaletteRequest, shortcutsHelpRequest } from '$lib/keyboard/ui';
+  import { notificationsInbox } from '$lib/stores/notificationsInbox';
   import Alert from './Alert.svelte';
   import ToastHost from './ToastHost.svelte';
   import Icon from './Icon.svelte';
   import BrandMark from './BrandMark.svelte';
   import CommandPalette from './CommandPalette.svelte';
   import ShortcutsHelp from './ShortcutsHelp.svelte';
+  import NotificationMenu from './NotificationMenu.svelte';
   let {
     children,
     pendingOnboarding = false
@@ -25,7 +27,6 @@
 
   let collapsed = $state(false);
   let mobileOpen = $state(false);
-  let unread = $state(0);
   let searchQ = $state('');
   let searching = $state(false);
   let searchOpen = $state(false);
@@ -50,11 +51,11 @@
     $user ? (pendingOnboarding ? pendingNav : navByRole[$user.role] || []) : []
   );
   const brandHref = $derived(shellNav[0]?.href || '/');
+  const unread = $derived($notificationsInbox.unread);
 
   async function refreshUnread() {
     try {
-      const data = await api<{ unread: number }>('/api/v1/notifications');
-      unread = data.unread || 0;
+      await notificationsInbox.refresh({ limit: 12 });
     } catch {
       /* ignore when unauthenticated briefly */
     }
@@ -106,6 +107,10 @@
     refreshUnread();
     loadShops();
     const id = setInterval(refreshUnread, 45000);
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refreshUnread();
+    };
+    document.addEventListener('visibilitychange', onVis);
     const mq = window.matchMedia('(max-width: 1023px)');
     const syncNarrow = () => {
       isNarrow = mq.matches;
@@ -137,6 +142,7 @@
       clearInterval(id);
       mq.removeEventListener('change', syncNarrow);
       document.removeEventListener('fullscreenchange', onFs);
+      document.removeEventListener('visibilitychange', onVis);
       shortcutManager.uninstall();
     };
   });
@@ -268,6 +274,7 @@
     searchResults = null;
     searchQ = '';
     clearSession();
+    notificationsInbox.reset();
     const { clearPreferencesCache } = await import('$lib/stores/preferences');
     clearPreferencesCache();
     goto('/login');
@@ -451,7 +458,7 @@
           {#if item.key === 'notifications' && unread > 0}
             <span
               class={`nav-badge ms-auto ${collapsed ? 'lg:absolute lg:end-1 lg:top-1' : ''}`}
-              aria-label={`${unread} unread`}
+              aria-label={`${unread} ${$t('unread')}`}
             >
               {unread > 99 ? '99+' : unread}
             </span>
@@ -644,20 +651,7 @@
             <Icon name={isFullscreen ? 'minimize' : 'maximize'} size={17} />
           </button>
 
-          <a
-            href="/app/notifications"
-            class="btn btn-outline btn-icon relative"
-            aria-label={`${$t('notifications')}${unread ? `, ${unread} unread` : ''}`}
-          >
-            <Icon name="bell" size={17} />
-            {#if unread > 0}
-              <span
-                class="absolute -end-1 -top-1 inline-flex min-w-4 justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white"
-              >
-                {unread > 99 ? '99+' : unread}
-              </span>
-            {/if}
-          </a>
+          <NotificationMenu />
 
           {#if !isNarrow}
             <label class="sr-only" for="theme-select">{$t('theme')}</label>
